@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VoltaCliente Conchal — Login</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json"/>
+  <meta name="theme-color" content="#10b981"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="VoltaCliente"/>
+  <link rel="apple-touch-icon" href="/static/icon-192.png"/>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    h1,h2,h3,.brand { font-family: 'Syne', sans-serif; }
+    .bg-pattern {
+      background-color: #0f172a;
+      background-image: radial-gradient(circle at 20% 50%, rgba(16,185,129,0.12) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(99,102,241,0.10) 0%, transparent 40%);
+    }
+    .card-glass { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px); }
+    .input-field { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #f1f5f9; transition: all 0.2s; }
+    .input-field:focus { outline: none; border-color: #10b981; background: rgba(16,185,129,0.08); box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
+    .input-field::placeholder { color: rgba(255,255,255,0.3); }
+    .btn-primary { background: linear-gradient(135deg, #10b981, #059669); transition: all 0.2s; }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(16,185,129,0.35); }
+    .btn-mp { background: linear-gradient(135deg, #009ee3, #0070b9); transition: all 0.2s; }
+    .btn-mp:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,158,227,0.35); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+  </style>
+</head>
+<body class="bg-pattern min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-md">
+
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-xl">💬</div>
+        <span class="brand text-2xl font-800 text-white tracking-tight">VoltaCliente <span class="text-emerald-400">Conchal</span></span>
+      </div>
+      <p class="text-slate-400 text-sm">Retenção de clientes via WhatsApp para pequenos comércios</p>
+    </div>
+
+    <!-- Card Login -->
+    <div class="card-glass rounded-2xl p-8 mb-4">
+      <h2 class="brand text-xl font-700 text-white mb-6">Entrar na sua conta</h2>
+
+      {% for msg in get_flashed_messages(category_filter=["erro"]) %}
+      <div class="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl p-3 mb-5 flex items-center gap-2">
+        <span>⚠️</span> {{ msg }}
+      </div>
+      {% endfor %}
+
+      <form method="POST">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-slate-400 text-xs font-500 uppercase tracking-wider mb-2">E-mail</label>
+            <input type="email" name="email" placeholder="seu@email.com"
+              class="input-field w-full rounded-xl px-4 py-3 text-sm" required />
+          </div>
+          <div>
+            <label class="block text-slate-400 text-xs font-500 uppercase tracking-wider mb-2">Senha</label>
+            <input type="password" name="senha" placeholder="••••••••"
+              class="input-field w-full rounded-xl px-4 py-3 text-sm" required />
+          </div>
+        </div>
+        <button type="submit" class="btn-primary w-full mt-6 py-3 rounded-xl text-white font-600 text-sm tracking-wide">
+          Entrar →
+        </button>
+      </form>
+    </div>
+
+    <!-- Botão Assinar -->
+    <div class="card-glass rounded-2xl p-5 text-center">
+      <p class="text-slate-400 text-sm mb-3">Ainda não tem acesso? Assine agora e comece a usar!</p>
+      <a href="https://www.mercadopago.com.br/subscriptions/checkout?preapproval_plan_id=e7620a7230d34fd3a57672a36263ea9b"
+         target="_blank"
+         class="btn-mp inline-flex items-center justify-center gap-2 w-full py-3 rounded-xl text-white font-600 text-sm">
+        💳 Assinar via Mercado Pago
+      </a>
+      <p class="text-slate-600 text-xs mt-3">Assinatura mensal · Cancele quando quiser</p>
+    </div>
+
+    <p class="text-center text-slate-600 text-xs mt-6">VoltaCliente Conchal © 2025</p>
+  </div>
+</body>
+</html>

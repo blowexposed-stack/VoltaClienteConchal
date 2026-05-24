@@ -19,7 +19,10 @@ from database.models import (
 )
 
 app = Flask(__name__)
-app.secret_key = "sua-chave-secreta-troque-em-producao"  # ⚠️ Trocar em produção!
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "sua-chave-secreta-local-troque-em-producao"
+)
 
 
 # ──────────────────────────────────────────────
@@ -173,6 +176,7 @@ def service_worker():
 # ──────────────────────────────────────────────
 if __name__ == "__main__":
     print("🚀 Iniciando Micro-SaaS de Retenção de Clientes...")
-    print("📱 Acesse: http://localhost:5000")
+    port = int(os.environ.get("PORT", 5000))
+    print(f"📱 Acesse: http://localhost:{port}")
     print("🔑 Login demo: admin@demo.com / demo123")
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=False, host="0.0.0.0", port=port)

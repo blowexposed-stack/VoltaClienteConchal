@@ -17,6 +17,7 @@ from database.models import (
     init_db, buscar_usuario_por_email,
     criar_cliente_e_agendamento, listar_agendamentos
 )
+from notificacoes import notificar_login_admin
 
 app = Flask(__name__)
 app.secret_key = os.environ.get(
@@ -65,6 +66,7 @@ def login():
             session["usuario_id"] = usuario["id"]
             session["usuario_nome"] = usuario["nome"]
             session["nome_comercio"] = usuario["nome_comercio"]
+            notificar_login_admin(usuario, metodo="email_senha")
             return redirect(url_for("dashboard"))
         else:
             flash("E-mail ou senha incorretos. Tente: admin@demo.com / demo123", "erro")

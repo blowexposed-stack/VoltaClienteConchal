@@ -49,6 +49,24 @@
 </head>
 <body class="min-h-screen">
 
+{% if is_demo %}
+<div class="fixed bottom-4 right-4 z-40 rounded-xl border border-emerald-500/30 bg-slate-950/95 px-4 py-3 shadow-xl">
+  <p class="text-slate-400 text-xs">Degustacao sem login</p>
+  <p class="text-white text-sm font-600">Tempo restante: <span id="demo-timer" class="text-emerald-400">--:--</span></p>
+</div>
+
+<div id="login-lock-modal" class="hidden fixed inset-0 z-50 bg-black/75 p-4 items-center justify-center">
+  <div class="card rounded-2xl p-6 max-w-sm w-full text-center">
+    <div class="w-12 h-12 rounded-xl bg-emerald-500 mx-auto flex items-center justify-center font-bold text-white mb-4">VC</div>
+    <h2 class="brand text-xl font-700 text-white mb-2">Seu teste livre terminou</h2>
+    <p class="text-slate-400 text-sm mb-5">
+      Crie sua conta para liberar 7 dias gratis. Depois disso, o plano premium custa R$ 30,00 por mes.
+    </p>
+    <a href="/login" class="btn-primary block rounded-xl py-3 text-white font-600">Criar conta ou entrar</a>
+  </div>
+</div>
+{% endif %}
+
 <!-- NAVBAR MOBILE -->
 <nav class="lg:hidden sticky top-0 z-50 flex items-center justify-between px-4 py-3"
      style="background:rgba(15,23,42,0.95);border-bottom:1px solid rgba(255,255,255,0.07);backdrop-filter:blur(12px)">
@@ -91,6 +109,23 @@
     {% for msg in get_flashed_messages(category_filter=["erro"]) %}
     <div class="flash-erro rounded-xl px-4 py-3 mb-5 flex items-center gap-2 text-sm">⚠️ {{ msg }}</div>
     {% endfor %}
+
+    {% if is_demo %}
+    <div class="card-highlight rounded-2xl p-4 mb-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <p class="text-emerald-300 text-sm font-600">Voce esta usando a degustacao de 10 minutos.</p>
+          <p class="text-slate-400 text-sm">Ao terminar, crie sua conta e ganhe 7 dias gratis.</p>
+        </div>
+        <a href="/login" class="btn-primary px-4 py-2 rounded-xl text-white text-sm font-600 text-center">Criar conta</a>
+      </div>
+    </div>
+    {% elif plan_status == "trial" %}
+    <div class="card-highlight rounded-2xl p-4 mb-6">
+      <p class="text-emerald-300 text-sm font-600">Trial ativo: {{ trial_days_remaining }} dia(s) restante(s).</p>
+      <p class="text-slate-400 text-sm">Depois do periodo gratis, o acesso continua no plano premium de R$ 30,00/mes.</p>
+    </div>
+    {% endif %}
 
     <!-- STATS -->
     <div class="grid grid-cols-3 gap-3 mb-8">
@@ -431,6 +466,30 @@
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/static/service-worker.js").catch(() => {});
   }
+
+  {% if is_demo %}
+  let demoRestante = Number("{{ demo_seconds_remaining|default(0) }}");
+  const demoTimer = document.getElementById("demo-timer");
+  const lockModal = document.getElementById("login-lock-modal");
+
+  function atualizarTimerDemo() {
+    const min = String(Math.floor(demoRestante / 60)).padStart(2, "0");
+    const sec = String(demoRestante % 60).padStart(2, "0");
+    demoTimer.textContent = `${min}:${sec}`;
+
+    if (demoRestante <= 0) {
+      lockModal.classList.remove("hidden");
+      lockModal.classList.add("flex");
+      document.body.style.overflow = "hidden";
+      return;
+    }
+
+    demoRestante -= 1;
+  }
+
+  atualizarTimerDemo();
+  setInterval(atualizarTimerDemo, 1000);
+  {% endif %}
 </script>
 </body>
 </html>

@@ -1,11 +1,10 @@
 // service-worker.js
 // Responsável pelo cache offline e comportamento de app instalado
 
-const CACHE_NAME = "retencaopro-v1";
+const CACHE_NAME = "voltacliente-v2";
 
 // Arquivos que serão salvos no cache para funcionar offline
 const ARQUIVOS_CACHE = [
-  "/dashboard",
   "/login",
   "/static/manifest.json"
 ];

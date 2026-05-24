@@ -5,7 +5,7 @@ Usando sqlite3 nativo do Python para manter o projeto leve e sem dependências e
 
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Caminho do arquivo do banco de dados
 DB_PATH = os.path.join(os.path.dirname(__file__), "retencao.db")
@@ -16,6 +16,13 @@ def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row  # Permite acessar colunas pelo nome
     return conn
+
+
+def garantir_coluna(cursor, tabela: str, coluna: str, definicao: str):
+    """Adiciona uma coluna se ela ainda nao existir."""
+    colunas = [info[1] for info in cursor.execute(f"PRAGMA table_info({tabela})").fetchall()]
+    if coluna not in colunas:
+        cursor.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {definicao}")
 
 
 def init_db():
@@ -37,6 +44,12 @@ def init_db():
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    garantir_coluna(cursor, "usuarios", "trial_started_at", "TIMESTAMP")
+    garantir_coluna(cursor, "usuarios", "trial_ends_at", "TIMESTAMP")
+    garantir_coluna(cursor, "usuarios", "plan_status", "TEXT DEFAULT 'trial'")
+    garantir_coluna(cursor, "usuarios", "mp_preapproval_id", "TEXT")
+    garantir_coluna(cursor, "usuarios", "ultimo_login_em", "TIMESTAMP")
 
     # Tabela de clientes cadastrados pelo comerciante
     cursor.execute("""
@@ -75,9 +88,15 @@ def init_db():
         VALUES (?, ?, ?, ?)
     """, ("Admin Demo", "admin@demo.com", "demo123", "Barbearia do Demo"))
 
+    cursor.execute("""
+        UPDATE usuarios
+        SET plan_status = 'active'
+        WHERE email = 'admin@demo.com' AND (plan_status IS NULL OR plan_status = 'trial')
+    """)
+
     conn.commit()
     conn.close()
-    print("✅ Banco de dados inicializado com sucesso!")
+    print("Banco de dados inicializado com sucesso!")
 
 
 # ──────────────────────────────────────────────
@@ -92,6 +111,73 @@ def buscar_usuario_por_email(email: str):
     ).fetchone()
     conn.close()
     return usuario
+
+
+def buscar_usuario_por_id(usuario_id: int):
+    """Busca um usuario pelo ID salvo na sessao."""
+    conn = get_connection()
+    usuario = conn.execute(
+        "SELECT * FROM usuarios WHERE id = ?", (usuario_id,)
+    ).fetchone()
+    conn.close()
+    return usuario
+
+
+def criar_usuario_trial(nome: str, email: str, senha: str, nome_comercio: str):
+    """Cria um usuario com 7 dias gratis."""
+    agora = datetime.utcnow()
+    trial_ends = agora + timedelta(days=7)
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO usuarios
+            (nome, email, senha_hash, nome_comercio,
+             trial_started_at, trial_ends_at, plan_status)
+        VALUES (?, ?, ?, ?, ?, ?, 'trial')
+    """, (
+        nome,
+        email,
+        senha,
+        nome_comercio,
+        agora.isoformat(timespec="seconds"),
+        trial_ends.isoformat(timespec="seconds"),
+    ))
+    usuario_id = cursor.lastrowid
+    conn.commit()
+    usuario = cursor.execute(
+        "SELECT * FROM usuarios WHERE id = ?", (usuario_id,)
+    ).fetchone()
+    conn.close()
+    return usuario
+
+
+def registrar_login(usuario_id: int):
+    """Atualiza o horario do ultimo login."""
+    conn = get_connection()
+    conn.execute("""
+        UPDATE usuarios
+        SET ultimo_login_em = CURRENT_TIMESTAMP
+        WHERE id = ?
+    """, (usuario_id,))
+    conn.commit()
+    conn.close()
+
+
+def status_plano_usuario(usuario):
+    """Retorna active, trial ou expired."""
+    if not usuario:
+        return "demo"
+    if usuario["plan_status"] == "active":
+        return "active"
+    trial_ends_at = usuario["trial_ends_at"]
+    if trial_ends_at:
+        try:
+            trial_ends = datetime.fromisoformat(trial_ends_at)
+            if datetime.utcnow() <= trial_ends:
+                return "trial"
+        except ValueError:
+            pass
+    return "expired"
 
 
 def criar_cliente_e_agendamento(usuario_id, nome, celular, tipo_servico,

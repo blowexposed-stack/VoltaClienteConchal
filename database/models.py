@@ -53,8 +53,7 @@ def init_db():
     garantir_coluna(cursor, "usuarios", "mp_preapproval_id", "TEXT")
     garantir_coluna(cursor, "usuarios", "ultimo_login_em", "TIMESTAMP")
     garantir_coluna(cursor, "usuarios", "whatsapp_profissional", "TEXT")
-    garantir_coluna(cursor, "usuarios", "slug_link", "TEXT UNIQUE")
-
+    garantir_coluna(cursor, "usuarios", "slug_link", "TEXT")
     # Tabela de conversas com IA — controla se a IA esta ativa ou pausada por cliente
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS conversas_ia (

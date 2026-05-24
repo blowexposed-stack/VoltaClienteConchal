@@ -12,6 +12,7 @@ import os
 import sys
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import quote_plus
 
 from flask import (
     Flask, flash, jsonify, redirect, render_template,
@@ -22,14 +23,21 @@ sys.path.insert(0, os.path.dirname(__file__))
 from database.models import (
     buscar_usuario_por_email,
     buscar_usuario_por_id,
+    cancelar_agendamento_cliente,
     criar_cliente_e_agendamento,
+    criar_agendamento_publico,
     criar_usuario_trial,
+    garantir_horarios_padrao,
     init_db,
     listar_agendamentos,
+    listar_agendamentos_clientes,
+    listar_historico,
+    listar_horarios_livres,
     registrar_login,
     status_plano_usuario,
+    atualizar_whatsapp_profissional,
 )
-from notificacoes import notificar_login_admin
+from notificacoes import enviar_email_simples, notificar_login_admin
 
 
 app = Flask(__name__)
@@ -248,7 +256,21 @@ def dashboard():
         return redirect(url_for("dashboard"))
 
     agendamentos = listar_agendamentos(usuario_id)
+    garantir_horarios_padrao(usuario_id)
+    horarios_livres = listar_horarios_livres(usuario_id, limite=10)
+    agendamentos_site = listar_agendamentos_clientes(usuario_id)
+    historico = listar_historico(usuario_id)
     hoje = datetime.now().strftime("%Y-%m-%d")
+    public_agenda_url = url_for("agenda_publica", usuario_id=usuario_id, _external=True)
+    whatsapp_profissional = usuario["whatsapp_profissional"] if usuario else ""
+    msg_instagram = (
+        f"Ola, me chamo {{Nome}} e vim pelo Instagram. "
+        f"Quero ver os horarios disponiveis da {session.get('nome_comercio', 'manicure')}: {public_agenda_url}"
+    )
+    whatsapp_link_profissional = ""
+    if whatsapp_profissional:
+        numero = "".join(ch for ch in whatsapp_profissional if ch.isdigit())
+        whatsapp_link_profissional = f"https://wa.me/55{numero}?text={quote_plus(msg_instagram)}"
 
     return render_template(
         "dashboard.html",
@@ -261,7 +283,92 @@ def dashboard():
         plan_status=status_plano_usuario(usuario),
         trial_days_remaining=dias_trial_restantes(usuario),
         checkout_url=MERCADO_PAGO_CHECKOUT_URL,
+        public_agenda_url=public_agenda_url,
+        horarios_livres=horarios_livres,
+        agendamentos_site=agendamentos_site,
+        historico=historico,
+        whatsapp_profissional=whatsapp_profissional,
+        whatsapp_link_profissional=whatsapp_link_profissional,
+        msg_instagram=msg_instagram,
     )
+
+
+@app.route("/configuracao/whatsapp", methods=["POST"])
+@acesso_requerido
+def configurar_whatsapp():
+    usuario = usuario_atual()
+    if not usuario:
+        flash("Crie sua conta para salvar o WhatsApp profissional.", "erro")
+        return redirect(url_for("login"))
+    whatsapp = request.form.get("whatsapp_profissional", "").strip()
+    atualizar_whatsapp_profissional(usuario["id"], whatsapp)
+    flash("WhatsApp profissional salvo.", "sucesso")
+    return redirect(url_for("dashboard") + "#link-profissional")
+
+
+@app.route("/agenda/<int:usuario_id>", methods=["GET", "POST"])
+def agenda_publica(usuario_id):
+    usuario = buscar_usuario_por_id(usuario_id)
+    if not usuario:
+        return "Agenda nao encontrada.", 404
+
+    garantir_horarios_padrao(usuario_id)
+
+    if request.method == "POST":
+        nome = request.form.get("nome", "").strip()
+        celular = request.form.get("celular", "").strip()
+        servico = request.form.get("servico", "").strip()
+        horario_id = int(request.form.get("horario_id", "0"))
+
+        if not all([nome, celular, horario_id]):
+            flash("Preencha nome, WhatsApp e escolha um horario.", "erro")
+            return redirect(url_for("agenda_publica", usuario_id=usuario_id))
+
+        agendamento = criar_agendamento_publico(usuario_id, nome, celular, servico, horario_id)
+        if not agendamento:
+            flash("Esse horario nao esta mais disponivel. Escolha outro.", "erro")
+            return redirect(url_for("agenda_publica", usuario_id=usuario_id))
+
+        enviar_email_simples(
+            usuario["email"],
+            "Novo agendamento pelo VoltaCliente",
+            [
+                f"Nova cliente: {agendamento['cliente_nome']}",
+                f"WhatsApp: {agendamento['cliente_celular']}",
+                f"Servico: {agendamento['servico']}",
+                f"Data: {agendamento['data']} as {agendamento['hora_inicio']}",
+            ],
+        )
+        flash("Horario marcado com sucesso! O estabelecimento foi avisado.", "sucesso")
+        return redirect(url_for("agenda_publica", usuario_id=usuario_id))
+
+    return render_template(
+        "agenda_publica.html",
+        usuario=usuario,
+        horarios=listar_horarios_livres(usuario_id, limite=30),
+    )
+
+
+@app.route("/agendamentos-site/<int:agendamento_id>/cancelar", methods=["POST"])
+@acesso_requerido
+def cancelar_agendamento_site(agendamento_id):
+    usuario = usuario_atual()
+    usuario_id = usuario["id"] if usuario else DEMO_USER_ID
+    agendamento = cancelar_agendamento_cliente(usuario_id, agendamento_id)
+    if agendamento:
+        if usuario:
+            enviar_email_simples(
+                usuario["email"],
+                "Agendamento cancelado pelo VoltaCliente",
+                [
+                    f"Cliente: {agendamento['cliente_nome']}",
+                    f"Horario liberado: {agendamento['data']} as {agendamento['hora_inicio']}",
+                ],
+            )
+        flash("Agendamento cancelado e horario liberado.", "sucesso")
+    else:
+        flash("Nao foi possivel cancelar esse agendamento.", "erro")
+    return redirect(url_for("dashboard") + "#historico")
 
 
 @app.route("/pagamento")

@@ -50,6 +50,7 @@ def init_db():
     garantir_coluna(cursor, "usuarios", "plan_status", "TEXT DEFAULT 'trial'")
     garantir_coluna(cursor, "usuarios", "mp_preapproval_id", "TEXT")
     garantir_coluna(cursor, "usuarios", "ultimo_login_em", "TIMESTAMP")
+    garantir_coluna(cursor, "usuarios", "whatsapp_profissional", "TEXT")
 
     # Tabela de clientes cadastrados pelo comerciante
     cursor.execute("""
@@ -79,6 +80,55 @@ def init_db():
             criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
             FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS horarios_disponiveis (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER NOT NULL,
+            data DATE NOT NULL,
+            hora_inicio TEXT NOT NULL,
+            hora_fim TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'livre',
+            observacao TEXT,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+            UNIQUE (usuario_id, data, hora_inicio)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS agendamentos_clientes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER NOT NULL,
+            cliente_id INTEGER NOT NULL,
+            horario_id INTEGER,
+            servico TEXT,
+            status TEXT NOT NULL DEFAULT 'agendado',
+            origem TEXT DEFAULT 'site_publico',
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            cancelado_em TIMESTAMP,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+            FOREIGN KEY (cliente_id) REFERENCES clientes(id),
+            FOREIGN KEY (horario_id) REFERENCES horarios_disponiveis(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS historico_eventos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id INTEGER NOT NULL,
+            cliente_id INTEGER,
+            agendamento_cliente_id INTEGER,
+            tipo TEXT NOT NULL,
+            descricao TEXT NOT NULL,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+            FOREIGN KEY (cliente_id) REFERENCES clientes(id),
+            FOREIGN KEY (agendamento_cliente_id) REFERENCES agendamentos_clientes(id)
         )
     """)
 
@@ -280,3 +330,250 @@ def marcar_como_enviado(agendamento_id: int):
     """, (agendamento_id,))
     conn.commit()
     conn.close()
+
+
+def atualizar_whatsapp_profissional(usuario_id: int, whatsapp: str):
+    """Salva o WhatsApp profissional do estabelecimento."""
+    conn = get_connection()
+    conn.execute("""
+        UPDATE usuarios
+        SET whatsapp_profissional = ?
+        WHERE id = ?
+    """, (whatsapp, usuario_id))
+    conn.commit()
+    conn.close()
+
+
+def buscar_ou_criar_cliente(usuario_id: int, nome: str, celular: str):
+    """Busca cliente pelo celular ou cria um novo dentro da conta do lojista."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cliente = cursor.execute(
+        "SELECT * FROM clientes WHERE usuario_id = ? AND celular = ?",
+        (usuario_id, celular),
+    ).fetchone()
+
+    if cliente:
+        cursor.execute("UPDATE clientes SET nome = ? WHERE id = ?", (nome, cliente["id"]))
+        conn.commit()
+        cliente = cursor.execute("SELECT * FROM clientes WHERE id = ?", (cliente["id"],)).fetchone()
+        conn.close()
+        return cliente
+
+    cursor.execute(
+        "INSERT INTO clientes (usuario_id, nome, celular) VALUES (?, ?, ?)",
+        (usuario_id, nome, celular),
+    )
+    cliente_id = cursor.lastrowid
+    conn.commit()
+    cliente = cursor.execute("SELECT * FROM clientes WHERE id = ?", (cliente_id,)).fetchone()
+    conn.close()
+    return cliente
+
+
+def registrar_historico(usuario_id: int, tipo: str, descricao: str,
+                        cliente_id=None, agendamento_cliente_id=None):
+    """Registra um evento no historico da conta."""
+    conn = get_connection()
+    conn.execute("""
+        INSERT INTO historico_eventos
+            (usuario_id, cliente_id, agendamento_cliente_id, tipo, descricao)
+        VALUES (?, ?, ?, ?, ?)
+    """, (usuario_id, cliente_id, agendamento_cliente_id, tipo, descricao))
+    conn.commit()
+    conn.close()
+
+
+def listar_historico(usuario_id: int, limite: int = 30):
+    """Lista os eventos recentes do estabelecimento."""
+    conn = get_connection()
+    historico = conn.execute("""
+        SELECT h.*, c.nome AS cliente_nome, c.celular AS cliente_celular
+        FROM historico_eventos h
+        LEFT JOIN clientes c ON c.id = h.cliente_id
+        WHERE h.usuario_id = ?
+        ORDER BY h.criado_em DESC
+        LIMIT ?
+    """, (usuario_id, limite)).fetchall()
+    conn.close()
+    return historico
+
+
+def garantir_horarios_padrao(usuario_id: int, dias_a_frente: int = 21):
+    """
+    Cria uma grade simples se a conta ainda nao tiver horarios.
+    Segunda a sexta: 08:00-18:00; sabado: 08:00-12:00.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    total = cursor.execute(
+        "SELECT COUNT(*) AS total FROM horarios_disponiveis WHERE usuario_id = ?",
+        (usuario_id,),
+    ).fetchone()["total"]
+
+    if total:
+        conn.close()
+        return
+
+    hoje = datetime.now().date()
+    for offset in range(dias_a_frente):
+        dia = hoje + timedelta(days=offset)
+        weekday = dia.weekday()
+        if weekday >= 6:
+            continue
+        inicio = 8
+        fim = 12 if weekday == 5 else 18
+        for hora in range(inicio, fim):
+            cursor.execute("""
+                INSERT OR IGNORE INTO horarios_disponiveis
+                    (usuario_id, data, hora_inicio, hora_fim, status)
+                VALUES (?, ?, ?, ?, 'livre')
+            """, (
+                usuario_id,
+                dia.strftime("%Y-%m-%d"),
+                f"{hora:02d}:00",
+                f"{hora + 1:02d}:00",
+            ))
+
+    conn.commit()
+    conn.close()
+
+
+def listar_horarios_livres(usuario_id: int, limite: int = 30):
+    """Lista horarios livres futuros."""
+    conn = get_connection()
+    horarios = conn.execute("""
+        SELECT * FROM horarios_disponiveis
+        WHERE usuario_id = ?
+          AND status = 'livre'
+          AND data >= DATE('now', 'localtime')
+        ORDER BY data ASC, hora_inicio ASC
+        LIMIT ?
+    """, (usuario_id, limite)).fetchall()
+    conn.close()
+    return horarios
+
+
+def criar_agendamento_publico(usuario_id: int, nome: str, celular: str,
+                              servico: str, horario_id: int):
+    """Reserva um horario vindo do link publico da agenda."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    horario = cursor.execute("""
+        SELECT * FROM horarios_disponiveis
+        WHERE id = ? AND usuario_id = ? AND status = 'livre'
+    """, (horario_id, usuario_id)).fetchone()
+
+    if not horario:
+        conn.close()
+        return None
+
+    cliente = cursor.execute(
+        "SELECT * FROM clientes WHERE usuario_id = ? AND celular = ?",
+        (usuario_id, celular),
+    ).fetchone()
+    if cliente:
+        cliente_id = cliente["id"]
+        cursor.execute("UPDATE clientes SET nome = ? WHERE id = ?", (nome, cliente_id))
+    else:
+        cursor.execute(
+            "INSERT INTO clientes (usuario_id, nome, celular) VALUES (?, ?, ?)",
+            (usuario_id, nome, celular),
+        )
+        cliente_id = cursor.lastrowid
+
+    cursor.execute("""
+        UPDATE horarios_disponiveis
+        SET status = 'reservado', atualizado_em = CURRENT_TIMESTAMP
+        WHERE id = ?
+    """, (horario_id,))
+    cursor.execute("""
+        INSERT INTO agendamentos_clientes
+            (usuario_id, cliente_id, horario_id, servico, status, origem)
+        VALUES (?, ?, ?, ?, 'agendado', 'site_publico')
+    """, (usuario_id, cliente_id, horario_id, servico))
+    agendamento_id = cursor.lastrowid
+
+    descricao = (
+        f"{nome} marcou {servico or 'atendimento'} para "
+        f"{horario['data']} as {horario['hora_inicio']}."
+    )
+    cursor.execute("""
+        INSERT INTO historico_eventos
+            (usuario_id, cliente_id, agendamento_cliente_id, tipo, descricao)
+        VALUES (?, ?, ?, 'agendamento_criado', ?)
+    """, (usuario_id, cliente_id, agendamento_id, descricao))
+
+    conn.commit()
+    resultado = cursor.execute("""
+        SELECT ac.*, c.nome AS cliente_nome, c.celular AS cliente_celular,
+               hd.data, hd.hora_inicio, hd.hora_fim
+        FROM agendamentos_clientes ac
+        JOIN clientes c ON c.id = ac.cliente_id
+        JOIN horarios_disponiveis hd ON hd.id = ac.horario_id
+        WHERE ac.id = ?
+    """, (agendamento_id,)).fetchone()
+    conn.close()
+    return resultado
+
+
+def listar_agendamentos_clientes(usuario_id: int, limite: int = 30):
+    """Lista agendamentos feitos pelo site publico."""
+    conn = get_connection()
+    agendamentos = conn.execute("""
+        SELECT ac.*, c.nome AS cliente_nome, c.celular AS cliente_celular,
+               hd.data, hd.hora_inicio, hd.hora_fim
+        FROM agendamentos_clientes ac
+        JOIN clientes c ON c.id = ac.cliente_id
+        LEFT JOIN horarios_disponiveis hd ON hd.id = ac.horario_id
+        WHERE ac.usuario_id = ?
+        ORDER BY ac.criado_em DESC
+        LIMIT ?
+    """, (usuario_id, limite)).fetchall()
+    conn.close()
+    return agendamentos
+
+
+def cancelar_agendamento_cliente(usuario_id: int, agendamento_id: int):
+    """Cancela um agendamento publico e libera o horario."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    agendamento = cursor.execute("""
+        SELECT ac.*, c.nome AS cliente_nome, hd.data, hd.hora_inicio
+        FROM agendamentos_clientes ac
+        JOIN clientes c ON c.id = ac.cliente_id
+        LEFT JOIN horarios_disponiveis hd ON hd.id = ac.horario_id
+        WHERE ac.id = ? AND ac.usuario_id = ? AND ac.status = 'agendado'
+    """, (agendamento_id, usuario_id)).fetchone()
+
+    if not agendamento:
+        conn.close()
+        return None
+
+    if agendamento["horario_id"]:
+        cursor.execute("""
+            UPDATE horarios_disponiveis
+            SET status = 'livre', atualizado_em = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (agendamento["horario_id"],))
+
+    cursor.execute("""
+        UPDATE agendamentos_clientes
+        SET status = 'cancelado', cancelado_em = CURRENT_TIMESTAMP,
+            atualizado_em = CURRENT_TIMESTAMP
+        WHERE id = ?
+    """, (agendamento_id,))
+
+    descricao = (
+        f"{agendamento['cliente_nome']} desmarcou o horario de "
+        f"{agendamento['data']} as {agendamento['hora_inicio']}."
+    )
+    cursor.execute("""
+        INSERT INTO historico_eventos
+            (usuario_id, cliente_id, agendamento_cliente_id, tipo, descricao)
+        VALUES (?, ?, ?, 'agendamento_cancelado', ?)
+    """, (usuario_id, agendamento["cliente_id"], agendamento_id, descricao))
+
+    conn.commit()
+    conn.close()
+    return agendamento

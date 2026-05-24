@@ -195,8 +195,8 @@
 
           <div class="md:col-span-2">
             <label class="block text-slate-400 text-xs uppercase tracking-wider font-600 mb-2">Intervalo para Retorno *</label>
-            <div class="grid grid-cols-3 gap-3">
-              {% for dias, label in [(15,"15 dias"),(30,"30 dias"),(45,"45 dias")] %}
+            <div class="grid grid-cols-4 gap-3">
+              {% for dias, label in [(7,"7 dias"),(15,"15 dias"),(30,"30 dias"),(45,"45 dias")] %}
               <label class="cursor-pointer">
                 <input type="radio" name="intervalo" value="{{ dias }}" class="sr-only peer"
                   {{ "checked" if dias == 30 else "" }} onchange="atualizarMensagem()"/>
@@ -286,6 +286,41 @@
     </section>
 
     <!-- ══ FILA DE ENVIOS ══ -->
+    <section id="link-profissional" class="card rounded-2xl p-5 lg:p-7 mb-6">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center">IG</div>
+        <div>
+          <h2 class="brand font-700 text-white text-lg leading-tight">Link profissional para Instagram</h2>
+          <p class="text-slate-500 text-xs">Leve a cliente do Instagram para o WhatsApp e para sua agenda.</p>
+        </div>
+      </div>
+
+      <form method="POST" action="/configuracao/whatsapp" class="grid md:grid-cols-[1fr_auto] gap-3 mb-4">
+        <input name="whatsapp_profissional" value="{{ whatsapp_profissional or '' }}"
+               placeholder="WhatsApp profissional com DDD"
+               class="input-field w-full rounded-xl px-4 py-3 text-sm">
+        <button class="btn-primary px-5 py-3 rounded-xl text-white font-600 text-sm">Salvar WhatsApp</button>
+      </form>
+
+      <div class="space-y-3">
+        <div class="wpp-link-box rounded-xl p-4">
+          <label class="block text-slate-400 text-xs uppercase tracking-wider font-600 mb-2">Link da agenda publica</label>
+          <input readonly value="{{ public_agenda_url }}"
+                 class="bg-transparent text-emerald-400 text-xs w-full outline-none truncate">
+        </div>
+        <div class="wpp-link-box rounded-xl p-4">
+          <label class="block text-slate-400 text-xs uppercase tracking-wider font-600 mb-2">Mensagem pronta para WhatsApp</label>
+          <textarea readonly rows="3" class="bg-transparent text-emerald-400 text-xs w-full outline-none resize-none">{{ msg_instagram }}</textarea>
+        </div>
+        {% if whatsapp_link_profissional %}
+        <a href="{{ whatsapp_link_profissional }}" target="_blank"
+           class="btn-wpp w-full py-3 rounded-xl text-white font-600 text-sm flex items-center justify-center">
+          Abrir link profissional no WhatsApp
+        </a>
+        {% endif %}
+      </div>
+    </section>
+
     <section id="lista">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
@@ -394,6 +429,64 @@
     </section>
 
     <p class="text-center text-slate-700 text-xs mt-8">VoltaCliente Conchal © 2025 — Feito para pequenos comércios 💚</p>
+    {% if plan_status != "active" %}
+    <section class="card-highlight rounded-2xl p-5 lg:p-7 mt-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h2 class="brand font-700 text-white text-lg leading-tight">Seja premium e use sem expirar</h2>
+          <p class="text-slate-400 text-sm mt-1">Libere agenda, lembretes, historico e links profissionais por R$ 30,00/mes.</p>
+        </div>
+        <a href="{{ checkout_url }}" target="_blank" class="btn-primary px-5 py-3 rounded-xl text-white font-600 text-sm text-center">Assinar premium</a>
+      </div>
+    </section>
+    {% endif %}
+
+    <section id="agenda-site" class="card rounded-2xl p-5 lg:p-7 mt-6">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-9 h-9 rounded-xl bg-emerald-500/20 flex items-center justify-center">OK</div>
+        <div>
+          <h2 class="brand font-700 text-white text-lg leading-tight">Agendamentos pelo site</h2>
+          <p class="text-slate-500 text-xs">Clientes que marcaram pelo seu link publico.</p>
+        </div>
+      </div>
+      <div class="space-y-3">
+        {% for ag in agendamentos_site %}
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-xl border border-white/10 p-4">
+          <div>
+            <p class="text-white text-sm font-600">{{ ag.cliente_nome }} - {{ ag.servico or "Atendimento" }}</p>
+            <p class="text-slate-500 text-xs">{{ ag.cliente_celular }} | {{ ag.data }} as {{ ag.hora_inicio }} | {{ ag.status }}</p>
+          </div>
+          {% if ag.status == "agendado" %}
+          <form method="POST" action="/agendamentos-site/{{ ag.id }}/cancelar">
+            <button class="text-red-300 text-xs border border-red-400/30 rounded-lg px-3 py-2">Desmarcar</button>
+          </form>
+          {% endif %}
+        </div>
+        {% else %}
+        <p class="text-slate-500 text-sm">Nenhum agendamento pelo site ainda.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section id="historico" class="card rounded-2xl p-5 lg:p-7 mt-6">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-9 h-9 rounded-xl bg-slate-700/50 flex items-center justify-center">H</div>
+        <div>
+          <h2 class="brand font-700 text-white text-lg leading-tight">Historico em tempo real</h2>
+          <p class="text-slate-500 text-xs">Marcacoes, cancelamentos e movimentacoes da sua conta.</p>
+        </div>
+      </div>
+      <div class="space-y-3">
+        {% for ev in historico %}
+        <div class="rounded-xl border border-white/10 p-4">
+          <p class="text-white text-sm">{{ ev.descricao }}</p>
+          <p class="text-slate-500 text-xs mt-1">{{ ev.criado_em }}</p>
+        </div>
+        {% else %}
+        <p class="text-slate-500 text-sm">Sem historico por enquanto.</p>
+        {% endfor %}
+      </div>
+    </section>
   </main>
 </div>
 

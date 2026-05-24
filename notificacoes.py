@@ -72,3 +72,35 @@ def notificar_login_admin(usuario, metodo="login"):
     except Exception as erro:
         print(f"[NOTIFICACAO] Falha ao enviar e-mail de login: {erro}")
         return False
+
+
+def enviar_email_simples(destinatario, assunto, linhas):
+    """
+    Envia um e-mail simples para o estabelecimento.
+    Reaproveita as mesmas credenciais SMTP do Render.
+    """
+    smtp_host = os.environ.get("SMTP_HOST")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+    smtp_from = os.environ.get("SMTP_FROM_EMAIL", smtp_user or ADMIN_NOTIFY_EMAIL)
+
+    if not all([smtp_host, smtp_user, smtp_password, smtp_from, destinatario]):
+        print("[NOTIFICACAO] SMTP nao configurado; e-mail do estabelecimento nao enviado.")
+        return False
+
+    mensagem = EmailMessage()
+    mensagem["Subject"] = assunto
+    mensagem["From"] = smtp_from
+    mensagem["To"] = destinatario
+    mensagem.set_content("\n".join(linhas))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as servidor:
+            servidor.starttls()
+            servidor.login(smtp_user, smtp_password)
+            servidor.send_message(mensagem)
+        return True
+    except Exception as erro:
+        print(f"[NOTIFICACAO] Falha ao enviar e-mail simples: {erro}")
+        return False

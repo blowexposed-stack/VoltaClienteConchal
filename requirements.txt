@@ -1,10 +1,8 @@
 # 💬 VoltaCliente Conchal — Micro-SaaS de Retenção via WhatsApp
 
-MVP para barbearias, salões e pet shops com:
-- Funil de vendas anti-fraude (demo 10min por IP → trial 7 dias → R$ 30/mês)
-- Link da bio para agendamento público
-- IA via WhatsApp (Anthropic) com handoff automático para o humano
-- Lembretes automáticos de retorno
+flask>=3.1.3
+gunicorn>=26.0.0
+requests>=2.34.2
 
 ## 🚀 Rodar localmente
 

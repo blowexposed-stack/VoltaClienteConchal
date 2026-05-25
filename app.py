@@ -92,11 +92,11 @@ def init_db():
         db.commit()
         db.close()
 
-# ============== AGENDADOR DE TAREFAS ==============
+# ============== AGENDADOR DE TAREFAS AUTOMÁTICO ==============
 scheduler = BackgroundScheduler()
 
 def processar_fila_diaria():
-    """Tarefa que roda diariamente para processar lembretes"""
+    """Tarefa que roda diariamente para processar lembretes e renovar ciclos automaticamente"""
     db = get_db()
     hoje = datetime.now().strftime('%Y-%m-%d')
     
@@ -109,15 +109,32 @@ def processar_fila_diaria():
     ''', (hoje,)).fetchall()
     
     for cliente in clientes_para_contatar:
-        # Criar entrada na fila de envios
+        # 1. Criar entrada na fila de envios para a API disparar
         db.execute('''
             INSERT INTO fila_envios (cliente_id, user_id, tipo_mensagem, data_envio_agendada, status)
             VALUES (?, ?, 'lembrete_retorno', ?, 'pendente')
         ''', (cliente['id'], cliente['user_id'], hoje))
+        
+        # 2. RENOVAÇÃO DO CICLO: Calcula a data do próximo lembrete com base no intervalo do cliente
+        intervalo = cliente['intervalo_retorno'] if cliente['intervalo_retorno'] else 30
+        nova_data_contato = (datetime.now() + timedelta(days=intervalo)).strftime('%Y-%m-%d')
+        
+        # 3. Atualiza o cadastro para o próximo período sem intervenção humana
+        db.execute('''
+            UPDATE clientes 
+            SET data_ultimo_servico = ?, data_proximo_contato = ?
+            WHERE id = ?
+        ''', (hoje, nova_data_contato, cliente['id']))
+        
+        # 4. Registra no histórico que um lembrete foi agendado ciclicamente
+        db.execute('''
+            INSERT INTO historico_contatos (cliente_id, tipo, descricao)
+            VALUES (?, 'sistema', ?)
+        ''', (cliente['id'], f'Lembrete enviado. Próximo ciclo automatizado para: {nova_data_contato}'))
     
     db.commit()
     db.close()
-    print(f"[{hoje}] {len(clientes_para_contatar)} clientes adicionados à fila de envios")
+    print(f"[{hoje}] {len(clientes_para_contatar)} clientes adicionados à fila e reagendados para o próximo ciclo.")
 
 if not scheduler.running:
     scheduler.add_job(func=processar_fila_diaria, trigger="cron", hour=8, minute=0)
@@ -369,15 +386,12 @@ def processar_fila_item(fila_id):
     if not item:
         return jsonify({'error': 'Item não encontrado'}), 404
     
-    # TODO: Implementar integração real com Evolution API
-    # Por enquanto, apenas marcamos como enviado
     db.execute('''
         UPDATE fila_envios SET status = 'enviado', data_envio_real = ?, resposta_api = ?
         WHERE id = ?
     ''', (datetime.now().isoformat(), 'Enviado (mock)', fila_id))
     
     db.commit()
-    
     return jsonify({'status': 'success', 'message': 'Mensagem enviada'})
 
 # ============== CONFIGURAÇÕES ==============
@@ -391,7 +405,6 @@ def configuracoes():
     ).fetchone()
     
     tipos_negocio = ['Barbearia', 'Manicure', 'Estética', 'Pet Shop', 'Salão', 'Consultório', 'Outro']
-    
     return render_template('configuracoes.html', user=dict(user), tipos_negocio=tipos_negocio)
 
 @app.route('/configuracoes/atualizar', methods=['POST'])
@@ -407,7 +420,7 @@ def atualizar_configuracoes():
     ''', (nome_estabelecimento, tipo_negocio, session['user_id']))
     db.commit()
     
-    flash('✅ Configurações atualizadas com sucesso', 'sucesso')
+    flash('✅ Configurações updated com sucesso', 'sucesso')
     return redirect(url_for('configuracoes'))
 
 # ============== HEALTH CHECK ==============

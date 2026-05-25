@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VoltaCliente - Retenção via WhatsApp</title>
+  <link rel="manifest" href="/static/manifest.json"/>
+  <meta name="theme-color" content="#10b981"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    .brand { font-family: 'Syne', sans-serif; }
+    body { background:#0f172a; color:#e2e8f0; }
+    .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
+    .input-field { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#f1f5f9; }
+    .input-field:focus { outline:none; border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,0.15); }
+    .btn-primary { background:linear-gradient(135deg,#10b981,#059669); cursor:pointer; transition:all 0.3s; }
+    .btn-primary:hover { transform:translateY(-2px); box-shadow:0 10px 20px rgba(16,185,129,0.2); }
+  </style>
+</head>
+<body class="min-h-screen p-4 flex items-center justify-center">
+  <main class="w-full max-w-5xl grid lg:grid-cols-[0.9fr_1.1fr] gap-5">
+    <!-- Coluna esquerda: demo -->
+    <section class="card rounded-2xl p-6 lg:p-8 flex flex-col justify-between">
+      <div>
+        <div class="flex items-center gap-3 mb-8">
+          <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-xl font-bold text-white">VC</div>
+          <div>
+            <h1 class="brand text-3xl font-800 text-white">VoltaCliente</h1>
+            <p class="text-slate-400 text-sm">Retenção automática via WhatsApp</p>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-6 mb-6 space-y-3">
+          <p class="text-emerald-300 text-sm font-semibold">✨ Funciona para qualquer negócio</p>
+          <ul class="text-slate-300 text-sm space-y-2">
+            <li>✅ Barbearias, Manicures, Estéticas</li>
+            <li>✅ Pet Shops, Salões, Consultórios</li>
+            <li>✅ Lembretes automáticos em 7, 15 ou 30 dias</li>
+            <li>✅ Integração com WhatsApp em tempo real</li>
+          </ul>
+          <div class="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-950/60 px-4 py-2 text-sm">
+            ⏱️ Demo: <span id="timer" class="font-semibold text-emerald-300">10:00</span>
+          </div>
+        </div>
+        <a href="/dashboard_demo" class="btn-primary block text-center rounded-xl py-3 font-semibold text-white">
+          Testar agora (10 min grátis)
+        </a>
+      </div>
+      <div class="mt-6 text-xs text-slate-500">
+        💳 Após trial: R$ 30,00/mês com Mercado Pago
+      </div>
+    </section>
+
+    <!-- Coluna direita: cadastro + login -->
+    <section class="grid md:grid-cols-2 gap-5">
+      <div class="card rounded-2xl p-6">
+        <h2 class="brand text-xl font-700 text-white mb-2">Criar Conta</h2>
+        <p class="text-slate-400 text-sm mb-5">7 dias de trial grátis sem cartão</p>
+        {% for msg in get_flashed_messages(category_filter=['sucesso']) %}
+        <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm rounded-xl p-3 mb-4">{{ msg }}</div>
+        {% endfor %}
+        {% for msg in get_flashed_messages(category_filter=['erro']) %}
+        <div class="bg-red-500/10 border border-red-500/30 text-red-300 text-sm rounded-xl p-3 mb-4">{{ msg }}</div>
+        {% endfor %}
+        <form method="POST" action="/registrar" class="space-y-3">
+          <input name="nome" class="input-field w-full rounded-xl px-4 py-3 text-sm" placeholder="Seu nome" required>
+          <input name="nome_estabelecimento" class="input-field w-full rounded-xl px-4 py-3 text-sm" placeholder="Nome do estabelecimento" required>
+          <select name="tipo_negocio" class="input-field w-full rounded-xl px-4 py-3 text-sm" required>
+            <option value="">Tipo de negócio</option>
+            <option value="barbearia">Barbearia</option>
+            <option value="manicure">Manicure</option>
+            <option value="estetica">Estética</option>
+            <option value="pet_shop">Pet Shop</option>
+            <option value="salao">Salão</option>
+            <option value="consultorio">Consultório</option>
+            <option value="outro">Outro</option>
+          </select>
+          <input type="email" name="email" class="input-field w-full rounded-xl px-4 py-3 text-sm" placeholder="E-mail" required>
+          <input type="password" name="senha" class="input-field w-full rounded-xl px-4 py-3 text-sm" placeholder="Criar senha" required>
+          <button type="submit" class="btn-primary w-full rounded-xl py-3 font-semibold text-white">Criar conta</button>
+        </form>
+      </div>
+
+      <div class="card rounded-2xl p-6">
+        <h2 class="brand text-xl font-700 text-white mb-2">Já tem conta?</h2>
+        <p class="text-slate-400 text-sm mb-5">Entre para acessar sua conta</p>
+        <form method="POST" action="/login" class="space-y-3">
+          <input type="email" name="email" class="input-field w-full rounded-xl px-4 py-3 text-sm" placeholder="E-mail" required>
+          <input type="password" name="senha" class="input-field w-full rounded-xl px-4 py-3 text-sm" placeholder="Senha" required>
+          <button type="submit" class="btn-primary w-full rounded-xl py-3 font-semibold text-white">Entrar</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let restante = Number("{{ demo_seconds_remaining|default(600) }}");
+    const timer = document.getElementById("timer");
+    function renderTimer() {
+      const min = String(Math.floor(restante / 60)).padStart(2, "0");
+      const sec = String(restante % 60).padStart(2, "0");
+      timer.textContent = `${min}:${sec}`;
+      if (restante > 0) restante -= 1;
+    }
+    renderTimer();
+    setInterval(renderTimer, 1000);
+  </script>
+</body>
+</html>

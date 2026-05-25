@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VoltaCliente - Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    .brand { font-family: 'Syne', sans-serif; }
+    body { background:#0f172a; color:#e2e8f0; }
+    .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
+    .stat-card { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); }
+  </style>
+</head>
+<body class="min-h-screen p-4">
+  <div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-8">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-emerald-500 flex items-center justify-center text-lg font-bold">VC</div>
+        <div>
+          <h1 class="brand text-3xl font-800 text-white">VoltaCliente</h1>
+          <p class="text-slate-400 text-sm">{{ user.nome_estabelecimento }}</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-slate-300">{{ user.nome }}</span>
+        <a href="/logout" class="text-sm bg-red-500/20 text-red-300 px-4 py-2 rounded-lg hover:bg-red-500/30">Sair</a>
+      </div>
+    </header>
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div class="stat-card rounded-2xl p-6">
+        <p class="text-slate-400 text-sm">👥 Clientes ativos</p>
+        <p class="text-4xl font-bold text-emerald-400 mt-2">{{ total_clientes }}</p>
+      </div>
+      <div class="stat-card rounded-2xl p-6">
+        <p class="text-slate-400 text-sm">📱 Lembretes pendentes</p>
+        <p class="text-4xl font-bold text-blue-400 mt-2">{{ fila_pendente }}</p>
+      </div>
+      <div class="stat-card rounded-2xl p-6">
+        <p class="text-slate-400 text-sm">📅 Retorno essa semana</p>
+        <p class="text-4xl font-bold text-purple-400 mt-2">{{ clientes_semana|length }}</p>
+      </div>
+    </div>
+
+    <!-- Clientes para retorno essa semana -->
+    <div class="card rounded-2xl p-6 mb-8">
+      <h2 class="brand text-2xl font-700 text-white mb-4">📅 Clientes que devem retornar essa semana</h2>
+      {% if clientes_semana %}
+      <div class="space-y-3">
+        {% for cliente in clientes_semana %}
+        <div class="flex justify-between items-center border-l-4 border-purple-500 pl-4 py-3">
+          <div>
+            <p class="text-white font-semibold">{{ cliente.nome }}</p>
+            <p class="text-slate-400 text-sm">{{ cliente.tipo_servico }} • {{ cliente.data_proximo_contato }}</p>
+            <p class="text-slate-500 text-xs mt-1">📱 {{ cliente.whatsapp }}</p>
+          </div>
+          <form method="POST" action="/cliente/{{ cliente.id }}/registrar-servico" class="inline">
+            <input type="hidden" name="descricao" value="{{ cliente.tipo_servico }}">
+            <button type="submit" class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm hover:bg-emerald-500/30">✓ Registrar</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-slate-500">Nenhum cliente para retorno essa semana</p>
+      {% endif %}
+    </div>
+
+    <!-- Ações rápidas -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <a href="/cliente/novo" class="card rounded-2xl p-6 text-center hover:bg-emerald-500/20 transition">
+        <p class="text-4xl mb-2">➕</p>
+        <p class="text-white font-semibold">Novo cliente</p>
+      </a>
+      <a href="/clientes" class="card rounded-2xl p-6 text-center hover:bg-blue-500/20 transition">
+        <p class="text-4xl mb-2">👥</p>
+        <p class="text-white font-semibold">Ver clientes</p>
+      </a>
+      <a href="/servicos" class="card rounded-2xl p-6 text-center hover:bg-purple-500/20 transition">
+        <p class="text-4xl mb-2">🎯</p>
+        <p class="text-white font-semibold">Meus serviços</p>
+      </a>
+      <a href="/fila" class="card rounded-2xl p-6 text-center hover:bg-orange-500/20 transition">
+        <p class="text-4xl mb-2">📤</p>
+        <p class="text-white font-semibold">Fila de envios</p>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

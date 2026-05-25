@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Demo - VoltaCliente</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    body { background:#0f172a; color:#e2e8f0; }
+    .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
+  </style>
+</head>
+<body class="min-h-screen p-4">
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-8">
+      <span class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm font-semibold">🎭 MODO DEMONSTRAÇÃO</span>
+      <h1 class="text-4xl font-bold text-white mt-4">Bem-vindo ao VoltaCliente</h1>
+      <p class="text-slate-400 mt-2">Explore a plataforma por 10 minutos e depois crie sua conta para começar</p>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div class="card rounded-2xl p-8 text-center">
+        <p class="text-4xl mb-3">👥</p>
+        <h3 class="text-xl font-bold text-white mb-2">Gerencie clientes</h3>
+        <p class="text-slate-400 text-sm">Adicione clientes, defina intervalos de retorno automáticos (7, 15 ou 30 dias)</p>
+      </div>
+      
+      <div class="card rounded-2xl p-8 text-center">
+        <p class="text-4xl mb-3">📱</p>
+        <h3 class="text-xl font-bold text-white mb-2">WhatsApp automático</h3>
+        <p class="text-slate-400 text-sm">Lembretes automáticos via WhatsApp nas datas configuradas</p>
+      </div>
+      
+      <div class="card rounded-2xl p-8 text-center">
+        <p class="text-4xl mb-3">📊</p>
+        <h3 class="text-xl font-bold text-white mb-2">Dashboard inteligente</h3>
+        <p class="text-slate-400 text-sm">Veja quem deve retornar essa semana com um só clique</p>
+      </div>
+      
+      <div class="card rounded-2xl p-8 text-center">
+        <p class="text-4xl mb-3">🎯</p>
+        <h3 class="text-xl font-bold text-white mb-2">Multi-segmento</h3>
+        <p class="text-slate-400 text-sm">Funciona para barbearias, manicures, estéticas, pet shops e mais</p>
+      </div>
+    </div>
+    
+    <div class="text-center">
+      <p class="text-slate-400 mb-6">⏱️ Tempo de demo restante: <span id="timer" class="font-bold text-emerald-400">10:00</span></p>
+      <a href="/" class="bg-emerald-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-emerald-600 transition">← Voltar e criar conta</a>
+    </div>
+  </div>
+  
+  <script>
+    let restante = 600;
+    const timer = document.getElementById('timer');
+    setInterval(() => {
+      const min = String(Math.floor(restante / 60)).padStart(2, '0');
+      const sec = String(restante % 60).padStart(2, '0');
+      timer.textContent = `${min}:${sec}`;
+      if (restante > 0) restante -= 1;
+      else window.location.href = '/';
+    }, 1000);
+  </script>
+</body>
+</html>

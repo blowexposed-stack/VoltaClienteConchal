@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Novo Cliente</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    body { background:#0f172a; color:#e2e8f0; }
+    .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
+    .input-field { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#f1f5f9; }
+    .input-field:focus { outline:none; border-color:#10b981; }
+  </style>
+</head>
+<body class="min-h-screen p-4">
+  <div class="max-w-2xl mx-auto">
+    <a href="/clientes" class="text-emerald-400 text-sm mb-6 inline-block">← Voltar</a>
+    
+    <div class="card rounded-2xl p-8">
+      <h1 class="text-3xl font-bold text-white mb-6">➕ Adicionar novo cliente</h1>
+      
+      <form method="POST" class="space-y-4">
+        <div>
+          <label class="text-slate-300 text-sm font-semibold">Nome do cliente *</label>
+          <input type="text" name="nome" class="input-field w-full rounded-lg px-4 py-3 mt-2" placeholder="Seu cliente" required>
+        </div>
+        
+        <div>
+          <label class="text-slate-300 text-sm font-semibold">WhatsApp *</label>
+          <input type="tel" name="whatsapp" class="input-field w-full rounded-lg px-4 py-3 mt-2" placeholder="(11) 99999-9999" required>
+        </div>
+        
+        <div>
+          <label class="text-slate-300 text-sm font-semibold">E-mail</label>
+          <input type="email" name="email" class="input-field w-full rounded-lg px-4 py-3 mt-2" placeholder="cliente@email.com">
+        </div>
+        
+        <div>
+          <label class="text-slate-300 text-sm font-semibold">Tipo de serviço *</label>
+          <select name="tipo_servico" class="input-field w-full rounded-lg px-4 py-3 mt-2" required>
+            <option value="">Selecione um serviço</option>
+            {% for servico in servicos %}
+            <option value="{{ servico.nome }}">{{ servico.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div>
+          <label class="text-slate-300 text-sm font-semibold">Intervalo de retorno (dias) *</label>
+          <div class="grid grid-cols-3 gap-3 mt-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="intervalo_retorno" value="7" class="w-4 h-4">
+              <span class="text-slate-300">7 dias</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="intervalo_retorno" value="15" class="w-4 h-4">
+              <span class="text-slate-300">15 dias</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="intervalo_retorno" value="30" class="w-4 h-4" checked>
+              <span class="text-slate-300">30 dias</span>
+            </label>
+          </div>
+          <input type="number" name="intervalo_retorno" min="1" max="365" class="input-field w-full rounded-lg px-4 py-3 mt-2" placeholder="Ou especifique outro valor">
+        </div>
+        
+        <button type="submit" class="w-full bg-emerald-500 text-white py-3 rounded-lg font-semibold hover:bg-emerald-600 transition mt-6">
+          ✅ Adicionar cliente
+        </button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

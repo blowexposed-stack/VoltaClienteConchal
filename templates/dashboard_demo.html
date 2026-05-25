@@ -1,65 +1,115 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 <head>
   <meta charset="UTF-8" />
-  <title>Demo - VoltaCliente</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VoltaCliente - Dashboard Demo</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght=600;700;800&family=Inter:wght=300;400;500;600&display=swap" rel="stylesheet"/>
   <style>
     * { font-family: 'Inter', sans-serif; }
+    .brand { font-family: 'Syne', sans-serif; }
     body { background:#0f172a; color:#e2e8f0; }
     .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
+    .stat-card { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); }
   </style>
 </head>
 <body class="min-h-screen p-4">
-  <div class="max-w-6xl mx-auto">
-    <div class="text-center mb-8">
-      <span class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm font-semibold">🎭 MODO DEMONSTRAÇÃO</span>
-      <h1 class="text-4xl font-bold text-white mt-4">Bem-vindo ao VoltaCliente</h1>
-      <p class="text-slate-400 mt-2">Explore a plataforma por 10 minutos e depois crie sua conta para começar</p>
-    </div>
+  <div class="max-w-7xl mx-auto">
     
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-      <div class="card rounded-2xl p-8 text-center">
-        <p class="text-4xl mb-3">👥</p>
-        <h3 class="text-xl font-bold text-white mb-2">Gerencie clientes</h3>
-        <p class="text-slate-400 text-sm">Adicione clientes, defina intervalos de retorno automáticos (7, 15 ou 30 dias)</p>
+    <div class="w-full bg-amber-500/20 border border-amber-500/30 rounded-2xl p-4 text-center mb-6">
+      <p class="text-amber-300 font-semibold text-sm">🎭 MODO DEMONSTRAÇÃO — Esta é uma página de testes temporária.</p>
+    </div>
+
+    <header class="flex justify-between items-center mb-8">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-emerald-500 flex items-center justify-center text-lg font-bold text-slate-900">VC</div>
+        <div>
+          <h1 class="brand text-3xl font-800 text-white">VoltaCliente</h1>
+          <p class="text-slate-400 text-sm">Barbearia Demo (Demonstração)</p>
+        </div>
       </div>
-      
-      <div class="card rounded-2xl p-8 text-center">
-        <p class="text-4xl mb-3">📱</p>
-        <h3 class="text-xl font-bold text-white mb-2">WhatsApp automático</h3>
-        <p class="text-slate-400 text-sm">Lembretes automáticos via WhatsApp nas datas configuradas</p>
+      <div class="flex items-center gap-4">
+        <span class="text-slate-300">Utilizador de Teste</span>
+        <a href="/" class="text-sm bg-red-500/20 text-red-300 px-4 py-2 rounded-lg hover:bg-red-500/30">Sair</a>
       </div>
-      
-      <div class="card rounded-2xl p-8 text-center">
-        <p class="text-4xl mb-3">📊</p>
-        <h3 class="text-xl font-bold text-white mb-2">Dashboard inteligente</h3>
-        <p class="text-slate-400 text-sm">Veja quem deve retornar essa semana com um só clique</p>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div class="stat-card rounded-2xl p-6">
+        <p class="text-slate-400 text-sm">👥 Clientes ativos</p>
+        <p class="text-4xl font-bold text-emerald-400 mt-2">{{ total_clientes|default(18) }}</p>
       </div>
-      
-      <div class="card rounded-2xl p-8 text-center">
-        <p class="text-4xl mb-3">🎯</p>
-        <h3 class="text-xl font-bold text-white mb-2">Multi-segmento</h3>
-        <p class="text-slate-400 text-sm">Funciona para barbearias, manicures, estéticas, pet shops e mais</p>
+      <div class="stat-card rounded-2xl p-6">
+        <p class="text-slate-400 text-sm">📱 Lembretes pendentes</p>
+        <p class="text-4xl font-bold text-blue-400 mt-2">{{ fila_pendente|default(5) }}</p>
+      </div>
+      <div class="stat-card rounded-2xl p-6">
+        <p class="text-slate-400 text-sm">📅 Retorno esta semana</p>
+        <p class="text-4xl font-bold text-purple-400 mt-2">
+          {% if clientes_semana %}{{ clientes_semana|length }}{% else %}2{% endif %}
+        </p>
       </div>
     </div>
-    
-    <div class="text-center">
-      <p class="text-slate-400 mb-6">⏱️ Tempo de demo restante: <span id="timer" class="font-bold text-emerald-400">10:00</span></p>
-      <a href="/" class="bg-emerald-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-emerald-600 transition">← Voltar e criar conta</a>
+
+    <div class="card rounded-2xl p-6 mb-8">
+      <h2 class="brand text-2xl font-700 text-white mb-4">📅 Clientes que devem retornar esta semana</h2>
+      
+      <div class="space-y-3">
+        {% if clientes_semana %}
+          {% for cliente in clientes_semana %}
+          <div class="flex justify-between items-center border-l-4 border-purple-500 pl-4 py-3 bg-white/5 rounded-r-xl pr-4">
+            <div>
+              <p class="text-white font-semibold">{{ cliente.nome }}</p>
+              <p class="text-slate-400 text-sm">{{ cliente.tipo_servico }} • {{ cliente.data_proximo_contato }}</p>
+              <p class="text-slate-500 text-xs mt-1">📱 {{ cliente.whatsapp }}</p>
+            </div>
+            <form method="POST" action="/cliente/{{ cliente.id }}/registrar-servico" class="inline" onsubmit="alert('Ação simulada com sucesso na demo!'); return false;">
+              <input type="hidden" name="descricao" value="{{ cliente.tipo_servico }}">
+              <button type="submit" class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm hover:bg-emerald-500/30 transition">✓ Registar</button>
+            </form>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="flex justify-between items-center border-l-4 border-purple-500 pl-4 py-3 bg-white/5 rounded-r-xl pr-4">
+            <div>
+              <p class="text-white font-semibold">Carlos Silva (Exemplo)</p>
+              <p class="text-slate-400 text-sm">Corte & Barba • Hoje</p>
+              <p class="text-slate-500 text-xs mt-1">📱 (19) 99999-1111</p>
+            </div>
+            <button onclick="alert('Ação simulada com sucesso na demo!')" class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm hover:bg-emerald-500/30 transition">✓ Registar</button>
+          </div>
+          <div class="flex justify-between items-center border-l-4 border-purple-500 pl-4 py-3 bg-white/5 rounded-r-xl pr-4">
+            <div>
+              <p class="text-white font-semibold">Mateus Santos (Exemplo)</p>
+              <p class="text-slate-400 text-sm">Degradê Navalhado • Amanhã</p>
+              <p class="text-slate-500 text-xs mt-1">📱 (19) 99999-2222</p>
+            </div>
+            <button onclick="alert('Ação simulada com sucesso na demo!')" class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm hover:bg-emerald-500/30 transition">✓ Registar</button>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <a href="/cliente/novo" class="card rounded-2xl p-6 text-center hover:bg-emerald-500/20 transition">
+        <p class="text-4xl mb-2">➕</p>
+        <p class="text-white font-semibold">Novo cliente</p>
+      </a>
+      <button onclick="alert('Cria uma conta real para aceder à listagem completa de clientes.')" class="card rounded-2xl p-6 text-center hover:bg-blue-500/20 transition">
+        <p class="text-4xl mb-2">👥</p>
+        <p class="text-white font-semibold">Ver clientes</p>
+      </button>
+      <button onclick="alert('Cria uma conta real para gerir os teus serviços.')" class="card rounded-2xl p-6 text-center hover:bg-purple-500/20 transition">
+        <p class="text-4xl mb-2">🎯</p>
+        <p class="text-white font-semibold">Meus serviços</p>
+      </button>
+      <button onclick="alert('Cria uma conta real para visualizar a fila de envios de mensagens.')" class="card rounded-2xl p-6 text-center hover:bg-orange-500/20 transition">
+        <p class="text-4xl mb-2">📤</p>
+        <p class="text-white font-semibold">Fila de envios</p>
+      </button>
     </div>
   </div>
-  
-  <script>
-    let restante = 600;
-    const timer = document.getElementById('timer');
-    setInterval(() => {
-      const min = String(Math.floor(restante / 60)).padStart(2, '0');
-      const sec = String(restante % 60).padStart(2, '0');
-      timer.textContent = `${min}:${sec}`;
-      if (restante > 0) restante -= 1;
-      else window.location.href = '/';
-    }, 1000);
-  </script>
 </body>
 </html>

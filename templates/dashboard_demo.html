@@ -13,13 +13,20 @@
     body { background:#0f172a; color:#e2e8f0; }
     .card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
     .stat-card { background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); }
+    .timer-warning { animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
   </style>
 </head>
 <body class="min-h-screen p-4">
   <div class="max-w-7xl mx-auto">
     
+    <!-- TIMER FLUTUANTE -->
+    <div id="timer-container" class="fixed top-4 right-4 bg-red-500/90 text-white px-6 py-3 rounded-xl font-bold text-lg timer-warning z-50 shadow-lg">
+      ⏱️ Demo: <span id="timer">10:00</span>
+    </div>
+
     <div class="w-full bg-amber-500/20 border border-amber-500/30 rounded-2xl p-4 text-center mb-6">
-      <p class="text-amber-300 font-semibold text-sm">🎭 MODO DEMONSTRAÇÃO — Esta é uma página de testes temporária.</p>
+      <p class="text-amber-300 font-semibold text-sm">🎭 MODO DEMONSTRAÇÃO — Você tem 10 minutos para explorar. Após isso, será solicitado criar uma conta.</p>
     </div>
 
     <header class="flex justify-between items-center mb-8">
@@ -32,7 +39,7 @@
       </div>
       <div class="flex items-center gap-4">
         <span class="text-slate-300">Utilizador de Teste</span>
-        <a href="/" class="text-sm bg-red-500/20 text-red-300 px-4 py-2 rounded-lg hover:bg-red-500/30">Sair</a>
+        <a href="/logout" class="text-sm bg-red-500/20 text-red-300 px-4 py-2 rounded-lg hover:bg-red-500/30">Sair da Demo</a>
       </div>
     </header>
 
@@ -65,10 +72,7 @@
               <p class="text-slate-400 text-sm">{{ cliente.tipo_servico }} • {{ cliente.data_proximo_contato }}</p>
               <p class="text-slate-500 text-xs mt-1">📱 {{ cliente.whatsapp }}</p>
             </div>
-            <form method="POST" action="/cliente/{{ cliente.id }}/registrar-servico" class="inline" onsubmit="alert('Ação simulada com sucesso na demo!'); return false;">
-              <input type="hidden" name="descricao" value="{{ cliente.tipo_servico }}">
-              <button type="submit" class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm hover:bg-emerald-500/30 transition">✓ Registar</button>
-            </form>
+            <button onclick="demoAction('Ação simulada com sucesso! Crie uma conta para registar realmente.')" class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm hover:bg-emerald-500/30 transition">✓ Registar</button>
           </div>
           {% endfor %}
         {% else %}
@@ -78,38 +82,90 @@
               <p class="text-slate-400 text-sm">Corte & Barba • Hoje</p>
               <p class="text-slate-500 text-xs mt-1">📱 (19) 99999-1111</p>
             </div>
-            <button onclick="alert('Ação simulada com sucesso na demo!')" class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm hover:bg-emerald-500/30 transition">✓ Registar</button>
+            <button onclick="demoAction('Ação simulada com sucesso! Crie uma conta para registar realmente.')" class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm hover:bg-emerald-500/30 transition">✓ Registar</button>
           </div>
           <div class="flex justify-between items-center border-l-4 border-purple-500 pl-4 py-3 bg-white/5 rounded-r-xl pr-4">
             <div>
               <p class="text-white font-semibold">Mateus Santos (Exemplo)</p>
               <p class="text-slate-400 text-sm">Degradê Navalhado • Amanhã</p>
-              <p class="text-slate-500 text-xs mt-1">📱 (19) 99999-2222</p>
+              <p class="text-slate-500 text-xs mt-1">��� (19) 99999-2222</p>
             </div>
-            <button onclick="alert('Ação simulada com sucesso na demo!')" class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm hover:bg-emerald-500/30 transition">✓ Registar</button>
+            <button onclick="demoAction('Ação simulada com sucesso! Crie uma conta para registar realmente.')" class="bg-emerald-500/20 text-emerald-300 px-4 py-2 rounded-lg text-sm hover:bg-emerald-500/30 transition">✓ Registar</button>
           </div>
         {% endif %}
       </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <a href="/cliente/novo" class="card rounded-2xl p-6 text-center hover:bg-emerald-500/20 transition">
+      <button onclick="demoAction('Cria uma conta real para adicionar novos clientes.')" class="card rounded-2xl p-6 text-center hover:bg-emerald-500/20 transition">
         <p class="text-4xl mb-2">➕</p>
         <p class="text-white font-semibold">Novo cliente</p>
-      </a>
-      <button onclick="alert('Cria uma conta real para aceder à listagem completa de clientes.')" class="card rounded-2xl p-6 text-center hover:bg-blue-500/20 transition">
+      </button>
+      <button onclick="demoAction('Cria uma conta real para aceder à listagem completa de clientes.')" class="card rounded-2xl p-6 text-center hover:bg-blue-500/20 transition">
         <p class="text-4xl mb-2">👥</p>
         <p class="text-white font-semibold">Ver clientes</p>
       </button>
-      <button onclick="alert('Cria uma conta real para gerir os teus serviços.')" class="card rounded-2xl p-6 text-center hover:bg-purple-500/20 transition">
+      <button onclick="demoAction('Cria uma conta real para gerir os teus serviços.')" class="card rounded-2xl p-6 text-center hover:bg-purple-500/20 transition">
         <p class="text-4xl mb-2">🎯</p>
         <p class="text-white font-semibold">Meus serviços</p>
       </button>
-      <button onclick="alert('Cria uma conta real para visualizar a fila de envios de mensagens.')" class="card rounded-2xl p-6 text-center hover:bg-orange-500/20 transition">
+      <button onclick="demoAction('Cria uma conta real para visualizar a fila de envios de mensagens.')" class="card rounded-2xl p-6 text-center hover:bg-orange-500/20 transition">
         <p class="text-4xl mb-2">📤</p>
         <p class="text-white font-semibold">Fila de envios</p>
       </button>
     </div>
+
+    <div class="mt-8 text-center">
+      <a href="/logout" class="inline-block bg-emerald-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-emerald-600 transition">
+        ✨ Criar Conta Agora
+      </a>
+    </div>
   </div>
+
+  <script>
+    // Variáveis do timer
+    let tempoRestante = {{ tempo_restante|default(600) }};
+    const tempoTotal = 600; // 10 minutos em segundos
+
+    // Atualiza o timer a cada segundo
+    function atualizarTimer() {
+      if (tempoRestante <= 0) {
+        // Demo expirou
+        document.getElementById('timer-container').innerHTML = '⏱️ Demo Expirada!';
+        document.getElementById('timer-container').classList.add('bg-red-900');
+        
+        setTimeout(() => {
+          alert('Seu tempo de demonstração de 10 minutos expirou! Crie uma conta para continuar usando o VoltaCliente.');
+          window.location.href = '/logout';
+        }, 2000);
+        return;
+      }
+
+      tempoRestante--;
+
+      // Formata o tempo em MM:SS
+      const minutos = Math.floor(tempoRestante / 60);
+      const segundos = tempoRestante % 60;
+      const tempoFormatado = `${minutos}:${segundos.toString().padStart(2, '0')}`;
+
+      // Atualiza o display
+      document.getElementById('timer').textContent = tempoFormatado;
+
+      // Muda cor quando falta 1 minuto
+      if (tempoRestante <= 60) {
+        document.getElementById('timer-container').classList.add('bg-red-600');
+        document.getElementById('timer-container').classList.remove('bg-red-500/90');
+      }
+    }
+
+    // Inicia o timer
+    setInterval(atualizarTimer, 1000);
+    atualizarTimer(); // Primeira atualização imediata
+
+    // Função para mostrar mensagem de demo
+    function demoAction(mensagem) {
+      alert('📌 MODO DEMO\n\n' + mensagem + '\n\nClique em "Criar Conta Agora" para começar.');
+    }
+  </script>
 </body>
 </html>

@@ -15,82 +15,86 @@ app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['JSON_SORT_KEYS'] = False
 
 # ============== BANCO DE DADOS ==============
-DATABASE = 'database/retencao.db'
+# Alterado para a pasta /tmp para evitar erros de permissão no Render
+DATABASE = '/tmp/retencao.db'
 
 def get_db():
     db = sqlite3.connect(DATABASE)
     db.row_factory = sqlite3.Row
+    # Aumenta o timeout para evitar travamentos de concorrência no SQLite
+    db.execute('PRAGMA busy_timeout = 30000;')
     return db
 
 def init_db():
-    os.makedirs('database', exist_ok=True)
-    if not os.path.exists(DATABASE):
-        db = get_db()
-        db.executescript('''
-            CREATE TABLE users (
-                id INTEGER PRIMARY KEY,
-                email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
-                nome TEXT,
-                nome_estabelecimento TEXT,
-                tipo_negocio TEXT DEFAULT 'barbearia',
-                trial_expiry TEXT,
-                status TEXT DEFAULT 'trial',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
-            
-            CREATE TABLE clientes (
-                id INTEGER PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                nome TEXT NOT NULL,
-                whatsapp TEXT NOT NULL,
-                email TEXT,
-                tipo_servico TEXT,
-                intervalo_retorno INTEGER DEFAULT 30,
-                data_ultimo_servico TEXT,
-                data_proximo_contato TEXT,
-                status TEXT DEFAULT 'ativo',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(user_id) REFERENCES users(id)
-            );
-            
-            CREATE TABLE servicos (
-                id INTEGER PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                nome TEXT NOT NULL,
-                intervalo_padrao INTEGER DEFAULT 30,
-                descricao TEXT,
-                ativo BOOLEAN DEFAULT 1,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(user_id) REFERENCES users(id)
-            );
-            
-            CREATE TABLE fila_envios (
-                id INTEGER PRIMARY KEY,
-                cliente_id INTEGER NOT NULL,
-                user_id INTEGER NOT NULL,
-                tipo_mensagem TEXT,
-                data_envio_agendada TEXT,
-                data_envio_real TEXT,
-                status TEXT DEFAULT 'pendente',
-                tentativas INTEGER DEFAULT 0,
-                resposta_api TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(cliente_id) REFERENCES clientes(id),
-                FOREIGN KEY(user_id) REFERENCES users(id)
-            );
-            
-            CREATE TABLE historico_contatos (
-                id INTEGER PRIMARY KEY,
-                cliente_id INTEGER NOT NULL,
-                tipo TEXT,
-                descricao TEXT,
-                data_contato TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(cliente_id) REFERENCES clientes(id)
-            );
-        ''')
-        db.commit()
-        db.close()
+    db = get_db()
+    db.executescript('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            nome TEXT,
+            nome_estabelecimento TEXT,
+            tipo_negocio TEXT DEFAULT 'barbearia',
+            trial_expiry TEXT,
+            status TEXT DEFAULT 'trial',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        CREATE TABLE IF NOT EXISTS clientes (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            nome TEXT NOT NULL,
+            whatsapp TEXT NOT NULL,
+            email TEXT,
+            tipo_servico TEXT,
+            intervalo_retorno INTEGER DEFAULT 30,
+            data_ultimo_servico TEXT,
+            data_proximo_contato TEXT,
+            status TEXT DEFAULT 'ativo',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+        
+        CREATE TABLE IF NOT EXISTS servicos (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            nome TEXT NOT NULL,
+            intervalo_padrao INTEGER DEFAULT 30,
+            descricao TEXT,
+            ativo BOOLEAN DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+        
+        CREATE TABLE IF NOT EXISTS fila_envios (
+            id INTEGER PRIMARY KEY,
+            cliente_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            tipo_mensagem TEXT,
+            data_envio_agendada TEXT,
+            data_envio_real TEXT,
+            status TEXT DEFAULT 'pendente',
+            tentativas INTEGER DEFAULT 0,
+            resposta_api TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(cliente_id) REFERENCES clientes(id),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+        
+        CREATE TABLE IF NOT EXISTS historico_contatos (
+            id INTEGER PRIMARY KEY,
+            cliente_id INTEGER NOT NULL,
+            tipo TEXT,
+            descricao TEXT,
+            data_contato TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(cliente_id) REFERENCES clientes(id)
+        );
+    ''')
+    db.commit()
+    db.close()
+
+# Garante que o banco seja inicializado ao rodar via Gunicorn no Render
+init_db()
 
 # ============== AGENDADOR DE TAREFAS AUTOMÁTICO ==============
 scheduler = BackgroundScheduler()
@@ -435,7 +439,6 @@ def not_found(error):
 
 # ============== INICIALIZAR ==============
 if __name__ == '__main__':
-    init_db()
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('FLASK_ENV') == 'development'
     app.run(host='0.0.0.0', port=port, debug=debug)

@@ -229,6 +229,20 @@ def start_demo():
     session['demo_inicio'] = datetime.now().isoformat()
     return redirect(url_for('dashboard_demo'))
 
+@app.route('/criar-conta-demo')
+def criar_conta_demo():
+    """Redireciona demo para página de criar conta com mensagem"""
+    session.clear()
+    flash('🎭 Você estava em modo demonstração. Crie sua conta agora para usar todas as funcionalidades!', 'info')
+    return redirect(url_for('index'))
+
+@app.route('/demo-expirada')
+def demo_expirada():
+    """Página quando demo expira"""
+    session.clear()
+    flash('⏱️ Seu tempo de demonstração de 10 minutos expirou! Crie uma conta para continuar.', 'info')
+    return redirect(url_for('index'))
+
 # ============== DASHBOARD & OUTRAS ROTAS ==============
 @app.route('/dashboard', methods=['GET', 'POST'])
 @login_required
@@ -283,8 +297,7 @@ def novo_cliente():
     """Rota para adicionar novo cliente (demo)"""
     if 'demo_mode' not in session:
         return redirect(url_for('start_demo'))
-    flash('📌 Na demo não é possível adicionar clientes. Crie uma conta para começar!', 'info')
-    return redirect(url_for('dashboard_demo'))
+    return redirect(url_for('criar_conta_demo'))
 
 @app.route('/dashboard/agendar/<slug>')
 def agenda_publica(slug):

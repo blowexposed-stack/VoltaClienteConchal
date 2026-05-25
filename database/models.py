@@ -1,0 +1,497 @@
+"""
+database/models.py
+
+Camada de acesso a dados — SQLite.
+Todas as tabelas do VoltaCliente Conchal ficam aqui.
+"""
+
+import sqlite3
+import os
+from datetime import datetime, timedelta
+
+DB_PATH = os.path.join(os.path.dirname(__file__), "retencao.db")
+
+DEMO_MINUTOS   = 10          # Duração do teste por IP
+TRIAL_DIAS     = 7           # Dias grátis após cadastro
+HANDOFF_HORAS  = 12          # Pausa da IA após intervenção humana
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CONEXÃO
+# ══════════════════════════════════════════════════════════════════════════════
+
+def get_conn():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# INICIALIZAÇÃO DO BANCO
+# ══════════════════════════════════════════════════════════════════════════════
+
+def init_db():
+    """Cria todas as tabelas se ainda não existirem."""
+    with get_conn() as conn:
+        conn.executescript("""
+        -- ── Usuários (donos do comércio) ──────────────────────────────────
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome            TEXT    NOT NULL,
+            nome_comercio   TEXT,
+            email           TEXT    UNIQUE NOT NULL,
+            senha           TEXT    NOT NULL,
+            ip_registro     TEXT,
+            trial_inicio    TEXT,
+            assinatura_ativa INTEGER DEFAULT 0,
+            slug            TEXT    UNIQUE,        -- link público: /agendar/<slug>
+            whatsapp        TEXT,                  -- número do dono (55119...)
+            criado_em       TEXT    DEFAULT (datetime('now','localtime'))
+        );
+
+        -- ── IPs em modo demo (10 min) ─────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS demo_ips (
+            ip          TEXT PRIMARY KEY,
+            iniciado_em TEXT NOT NULL
+        );
+
+        -- ── Clientes cadastrados pelo dono ────────────────────────────────
+        CREATE TABLE IF NOT EXISTS clientes (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            nome        TEXT    NOT NULL,
+            celular     TEXT    NOT NULL,
+            servico     TEXT,
+            criado_em   TEXT    DEFAULT (datetime('now','localtime'))
+        );
+
+        -- ── Agendamentos / lembretes de retorno ───────────────────────────
+        CREATE TABLE IF NOT EXISTS agendamentos (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id           INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            cliente_id           INTEGER REFERENCES clientes(id) ON DELETE SET NULL,
+            cliente_nome         TEXT    NOT NULL,
+            cliente_celular      TEXT    NOT NULL,
+            mensagem_personalizada TEXT,
+            data_envio           TEXT    NOT NULL,   -- DD/MM/YYYY
+            enviado              INTEGER DEFAULT 0,
+            criado_em            TEXT    DEFAULT (datetime('now','localtime'))
+        );
+
+        -- ── Horários disponíveis (agenda pública) ─────────────────────────
+        CREATE TABLE IF NOT EXISTS horarios (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            data        TEXT    NOT NULL,   -- DD/MM/YYYY
+            hora_inicio TEXT    NOT NULL,   -- HH:MM
+            ocupado     INTEGER DEFAULT 0,
+            criado_em   TEXT    DEFAULT (datetime('now','localtime'))
+        );
+
+        -- ── Agendamentos feitos pelo link público ─────────────────────────
+        CREATE TABLE IF NOT EXISTS agendamentos_publicos (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            horario_id  INTEGER NOT NULL REFERENCES horarios(id),
+            nome        TEXT    NOT NULL,
+            celular     TEXT    NOT NULL,
+            servico     TEXT,
+            status      TEXT    DEFAULT 'pendente',  -- pendente|confirmado|cancelado
+            criado_em   TEXT    DEFAULT (datetime('now','localtime'))
+        );
+
+        -- ── Controle de handoff IA ↔ Humano ──────────────────────────────
+        CREATE TABLE IF NOT EXISTS ia_pausa (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            celular     TEXT    NOT NULL,
+            pausado_ate TEXT    NOT NULL,
+            UNIQUE(usuario_id, celular)
+        );
+
+        -- ── Conversas da IA (histórico por cliente final) ─────────────────
+        CREATE TABLE IF NOT EXISTS conversas (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            celular     TEXT    NOT NULL,
+            role        TEXT    NOT NULL,   -- 'user' | 'assistant'
+            conteudo    TEXT    NOT NULL,
+            enviado_em  TEXT    DEFAULT (datetime('now','localtime'))
+        );
+        """)
+
+    # Dados de demo para facilitar testes
+    _seed_demo()
+
+
+def _seed_demo():
+    """Garante que o usuário demo exista."""
+    with get_conn() as conn:
+        existe = conn.execute(
+            "SELECT id FROM usuarios WHERE email = ?", ("admin@demo.com",)
+        ).fetchone()
+        if not existe:
+            from datetime import datetime, timedelta
+            trial = (datetime.now() + timedelta(days=TRIAL_DIAS)).strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute("""
+                INSERT INTO usuarios (nome, nome_comercio, email, senha,
+                                      trial_inicio, assinatura_ativa, slug, whatsapp)
+                VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+            """, ("Admin Demo", "Barbearia Demo",
+                  "admin@demo.com", "demo123",
+                  trial, "demo", "5519999990000"))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEMO POR IP
+# ══════════════════════════════════════════════════════════════════════════════
+
+def demo_segundos_restantes(ip: str) -> int:
+    """Retorna quantos segundos de demo ainda restam para o IP. 0 = expirado."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT iniciado_em FROM demo_ips WHERE ip = ?", (ip,)
+        ).fetchone()
+        if not row:
+            return DEMO_MINUTOS * 60
+        inicio = datetime.fromisoformat(row["iniciado_em"])
+        decorrido = (datetime.now() - inicio).total_seconds()
+        restante = max(0, DEMO_MINUTOS * 60 - int(decorrido))
+        return restante
+
+
+def demo_iniciar(ip: str):
+    """Registra o início do demo para este IP (idempotente)."""
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT OR IGNORE INTO demo_ips (ip, iniciado_em)
+            VALUES (?, datetime('now','localtime'))
+        """, (ip,))
+
+
+def demo_expirado(ip: str) -> bool:
+    return demo_segundos_restantes(ip) == 0
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# USUÁRIOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def criar_usuario(nome, nome_comercio, email, senha, ip) -> dict | None:
+    """
+    Cria usuário novo.
+    Retorna o usuário criado ou None se e-mail/IP já usado.
+    """
+    with get_conn() as conn:
+        # Bloqueia múltiplas contas por IP
+        ja_existe_ip = conn.execute(
+            "SELECT id FROM usuarios WHERE ip_registro = ?", (ip,)
+        ).fetchone()
+        if ja_existe_ip:
+            return None
+
+        ja_existe_email = conn.execute(
+            "SELECT id FROM usuarios WHERE email = ?", (email,)
+        ).fetchone()
+        if ja_existe_email:
+            return None
+
+        import re, secrets
+        slug_base = re.sub(r"[^a-z0-9]", "", nome_comercio.lower()) if nome_comercio else "comercio"
+        slug = slug_base + secrets.token_hex(3)
+
+        trial_fim = (datetime.now() + timedelta(days=TRIAL_DIAS)).strftime("%Y-%m-%d %H:%M:%S")
+
+        conn.execute("""
+            INSERT INTO usuarios
+                (nome, nome_comercio, email, senha, ip_registro,
+                 trial_inicio, assinatura_ativa, slug)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+        """, (nome, nome_comercio, email, senha, ip, trial_fim, slug))
+
+        return buscar_usuario_por_email(email)
+
+
+def buscar_usuario_por_email(email: str) -> sqlite3.Row | None:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM usuarios WHERE email = ?", (email,)
+        ).fetchone()
+
+
+def buscar_usuario_por_id(uid: int) -> sqlite3.Row | None:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM usuarios WHERE id = ?", (uid,)
+        ).fetchone()
+
+
+def buscar_usuario_por_slug(slug: str) -> sqlite3.Row | None:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM usuarios WHERE slug = ?", (slug,)
+        ).fetchone()
+
+
+def usuario_tem_acesso(usuario: sqlite3.Row) -> bool:
+    """True se a conta ainda está dentro do trial ou com assinatura ativa."""
+    if usuario["assinatura_ativa"]:
+        return True
+    if usuario["trial_inicio"]:
+        fim = datetime.fromisoformat(usuario["trial_inicio"])
+        return datetime.now() < fim
+    return False
+
+
+def ativar_assinatura(usuario_id: int):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE usuarios SET assinatura_ativa = 1 WHERE id = ?",
+            (usuario_id,)
+        )
+
+
+def salvar_whatsapp_usuario(usuario_id: int, numero: str):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE usuarios SET whatsapp = ? WHERE id = ?",
+            (numero, usuario_id)
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLIENTES
+# ══════════════════════════════════════════════════════════════════════════════
+
+def listar_clientes(usuario_id: int) -> list:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT * FROM clientes WHERE usuario_id = ? ORDER BY nome",
+            (usuario_id,)
+        ).fetchall()
+
+
+def criar_cliente(usuario_id, nome, celular, servico="") -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO clientes (usuario_id, nome, celular, servico) VALUES (?,?,?,?)",
+            (usuario_id, nome, celular, servico)
+        )
+        return cur.lastrowid
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AGENDAMENTOS / LEMBRETES
+# ══════════════════════════════════════════════════════════════════════════════
+
+def listar_agendamentos(usuario_id: int) -> list:
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT a.*, c.nome AS nome_cliente_ref
+            FROM agendamentos a
+            LEFT JOIN clientes c ON c.id = a.cliente_id
+            WHERE a.usuario_id = ?
+            ORDER BY a.data_envio DESC
+        """, (usuario_id,)).fetchall()
+
+
+def criar_agendamento(usuario_id, cliente_nome, cliente_celular,
+                      mensagem, data_envio, cliente_id=None) -> int:
+    with get_conn() as conn:
+        cur = conn.execute("""
+            INSERT INTO agendamentos
+                (usuario_id, cliente_id, cliente_nome, cliente_celular,
+                 mensagem_personalizada, data_envio)
+            VALUES (?,?,?,?,?,?)
+        """, (usuario_id, cliente_id, cliente_nome, cliente_celular,
+              mensagem, data_envio))
+        return cur.lastrowid
+
+
+def buscar_agendamentos_para_hoje() -> list:
+    hoje = datetime.now().strftime("%d/%m/%Y")
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT a.*, u.nome AS dono_nome
+            FROM agendamentos a
+            JOIN usuarios u ON u.id = a.usuario_id
+            WHERE a.data_envio = ? AND a.enviado = 0
+        """, (hoje,)).fetchall()
+
+
+def marcar_como_enviado(agendamento_id: int):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE agendamentos SET enviado = 1 WHERE id = ?",
+            (agendamento_id,)
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HORÁRIOS (AGENDA PÚBLICA)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def listar_horarios(usuario_id: int, apenas_livres=False) -> list:
+    sql = "SELECT * FROM horarios WHERE usuario_id = ?"
+    params = [usuario_id]
+    if apenas_livres:
+        sql += " AND ocupado = 0"
+    sql += " ORDER BY data, hora_inicio"
+    with get_conn() as conn:
+        return conn.execute(sql, params).fetchall()
+
+
+def criar_horario(usuario_id, data, hora_inicio) -> int:
+    with get_conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO horarios (usuario_id, data, hora_inicio) VALUES (?,?,?)",
+            (usuario_id, data, hora_inicio)
+        )
+        return cur.lastrowid
+
+
+def deletar_horario(horario_id: int, usuario_id: int):
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM horarios WHERE id = ? AND usuario_id = ? AND ocupado = 0",
+            (horario_id, usuario_id)
+        )
+
+
+def ocupar_horario(horario_id: int):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE horarios SET ocupado = 1 WHERE id = ?", (horario_id,)
+        )
+
+
+def liberar_horario(horario_id: int):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE horarios SET ocupado = 0 WHERE id = ?", (horario_id,)
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# AGENDAMENTOS PÚBLICOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def criar_agendamento_publico(usuario_id, horario_id, nome, celular, servico="") -> int | None:
+    with get_conn() as conn:
+        horario = conn.execute("""
+            SELECT id FROM horarios
+            WHERE id = ? AND usuario_id = ? AND ocupado = 0
+        """, (horario_id, usuario_id)).fetchone()
+        if not horario:
+            return None
+
+        cur = conn.execute("""
+            INSERT INTO agendamentos_publicos
+                (usuario_id, horario_id, nome, celular, servico)
+            VALUES (?,?,?,?,?)
+        """, (usuario_id, horario_id, nome, celular, servico))
+        conn.execute(
+            "UPDATE horarios SET ocupado = 1 WHERE id = ?",
+            (horario_id,),
+        )
+        return cur.lastrowid
+
+
+def listar_agendamentos_publicos(usuario_id: int) -> list:
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT ap.*, h.data, h.hora_inicio
+            FROM agendamentos_publicos ap
+            JOIN horarios h ON h.id = ap.horario_id
+            WHERE ap.usuario_id = ?
+            ORDER BY h.data, h.hora_inicio
+        """, (usuario_id,)).fetchall()
+
+
+def atualizar_status_agendamento_publico(agendamento_id: int, usuario_id: int, status: str):
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT id, horario_id FROM agendamentos_publicos
+            WHERE id = ? AND usuario_id = ?
+        """, (agendamento_id, usuario_id)).fetchone()
+        if not row:
+            return False
+
+        conn.execute("""
+            UPDATE agendamentos_publicos SET status = ?
+            WHERE id = ? AND usuario_id = ?
+        """, (status, agendamento_id, usuario_id))
+
+        if status == "cancelado":
+            conn.execute("UPDATE horarios SET ocupado = 0 WHERE id = ?", (row["horario_id"],))
+        elif status in ("pendente", "confirmado"):
+            conn.execute("UPDATE horarios SET ocupado = 1 WHERE id = ?", (row["horario_id"],))
+
+        return True
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HANDOFF IA ↔ HUMANO
+# ══════════════════════════════════════════════════════════════════════════════
+
+def ia_esta_pausada(usuario_id: int, celular: str) -> bool:
+    """Retorna True se a IA deve ficar em silêncio para este cliente."""
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT pausado_ate FROM ia_pausa
+            WHERE usuario_id = ? AND celular = ?
+        """, (usuario_id, celular)).fetchone()
+        if not row:
+            return False
+        ate = datetime.fromisoformat(row["pausado_ate"])
+        if datetime.now() < ate:
+            return True
+        # Pausa expirada — remove
+        conn.execute(
+            "DELETE FROM ia_pausa WHERE usuario_id = ? AND celular = ?",
+            (usuario_id, celular)
+        )
+        return False
+
+
+def pausar_ia(usuario_id: int, celular: str, horas: int = HANDOFF_HORAS):
+    """Pausa a IA para este cliente por N horas."""
+    ate = (datetime.now() + timedelta(hours=horas)).strftime("%Y-%m-%d %H:%M:%S")
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO ia_pausa (usuario_id, celular, pausado_ate)
+            VALUES (?,?,?)
+            ON CONFLICT(usuario_id, celular) DO UPDATE SET pausado_ate = excluded.pausado_ate
+        """, (usuario_id, celular, ate))
+
+
+def retomar_ia(usuario_id: int, celular: str):
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM ia_pausa WHERE usuario_id = ? AND celular = ?",
+            (usuario_id, celular)
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HISTÓRICO DE CONVERSA (IA)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def salvar_mensagem(usuario_id: int, celular: str, role: str, conteudo: str):
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO conversas (usuario_id, celular, role, conteudo)
+            VALUES (?,?,?,?)
+        """, (usuario_id, celular, role, conteudo))
+
+
+def buscar_historico(usuario_id: int, celular: str, limite: int = 10) -> list:
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT role, conteudo FROM conversas
+            WHERE usuario_id = ? AND celular = ?
+            ORDER BY id DESC LIMIT ?
+        """, (usuario_id, celular, limite)).fetchall()
+    return list(reversed(rows))

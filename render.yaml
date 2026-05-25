@@ -1,0 +1,23 @@
+﻿services:
+  - type: web
+    name: voltaclienteconchal
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DISPARADOR_TOKEN
+        sync: false
+
+  - type: cron
+    name: voltaclienteconchal-disparos
+    runtime: python
+    schedule: "0 12 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -c "import os, urllib.request; url=os.environ['APP_URL'].rstrip('/') + '/cron/disparos?token=' + os.environ['DISPARADOR_TOKEN']; print(urllib.request.urlopen(url, timeout=60).read().decode())"
+    envVars:
+      - key: APP_URL
+        sync: false
+      - key: DISPARADOR_TOKEN
+        sync: false

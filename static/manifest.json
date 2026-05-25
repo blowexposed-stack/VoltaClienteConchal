@@ -1,0 +1,9 @@
+{
+  "name": "VoltaCliente Conchal",
+  "short_name": "VoltaCliente",
+  "start_url": "/login",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#10b981",
+  "icons": []
+}

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Painel — {{ usuario.nome_comercio or usuario.nome }}</title>
+  <link rel="manifest" href="/static/manifest.json"/>
+  <meta name="theme-color" content="#10b981"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <link rel="apple-touch-icon" href="/static/icon-192.png"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *{font-family:'Inter',sans-serif}
+    .brand{font-family:'Syne',sans-serif}
+    body{background:#0f172a;color:#e2e8f0}
+    .card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+    .card2{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06)}
+    .inp{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);color:#f1f5f9}
+    .inp:focus{outline:none;border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.15)}
+    .btn-g{background:linear-gradient(135deg,#10b981,#059669)}
+    .btn-r{background:linear-gradient(135deg,#ef4444,#dc2626)}
+    .btn-b{background:linear-gradient(135deg,#3b82f6,#2563eb)}
+    .tab-btn{transition:all .2s;border:1px solid rgba(255,255,255,.08);color:#94a3b8}
+    .tab-btn.active{background:rgba(16,185,129,.15);border-color:#10b981;color:#34d399}
+    .tab-pane{display:none}.tab-pane.active{display:block}
+    .demo-overlay{pointer-events:none;opacity:.45;user-select:none;filter:blur(1.5px)}
+    .toast{opacity:0;transition:opacity .3s}.toast.show{opacity:1}
+    .ciclo-cb:checked + label{background:rgba(16,185,129,.2);border-color:#10b981;color:#34d399}
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- HEADER -->
+<header class="sticky top-0 z-50 backdrop-blur-md border-b border-white/5 px-4 py-3 flex items-center justify-between gap-3">
+  <div class="flex items-center gap-3 min-w-0">
+    <div class="w-9 h-9 shrink-0 rounded-xl bg-emerald-500 flex items-center justify-center font-bold text-white text-sm">VC</div>
+    <div class="min-w-0">
+      <h1 class="brand text-sm font-800 text-white truncate">{{ usuario.nome_comercio or usuario.nome }}</h1>
+      <p class="text-xs text-slate-500">VoltaCliente Conchal</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-2 shrink-0">
+    {% if demo %}
+      <span class="text-xs px-2 py-1 rounded-lg font-medium bg-violet-500/10 border border-violet-500/30 text-violet-300">
+        Demo&nbsp;<span id="hdr-timer" class="font-mono">10:00</span>
+      </span>
+    {% elif usuario.assinatura_ativa %}
+      <span class="text-xs px-2 py-1 rounded-lg font-medium bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">Premium ✓</span>
+    {% else %}
+      <span class="text-xs px-2 py-1 rounded-lg font-medium bg-amber-500/10 border border-amber-500/30 text-amber-300">Trial</span>
+    {% endif %}
+    <a href="/logout" class="text-xs text-slate-500 hover:text-white px-2 py-1 rounded-lg hover:bg-white/5">Sair</a>
+  </div>
+</header>
+
+<!-- BANNER DEMO -->
+{% if demo %}
+<div id="demo-banner" class="bg-violet-600/20 border-b border-violet-500/30 px-4 py-2 text-center text-xs text-violet-200">
+  👀 Você está no modo demonstração (somente leitura). Ao expirar, crie uma conta e ganhe <strong>7 dias grátis</strong>.
+</div>
+{% endif %}
+
+<!-- FLASH -->
+<div class="px-4 pt-3 max-w-5xl mx-auto space-y-2">
+  {% for m in get_flashed_messages(category_filter=["sucesso"]) %}
+  <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm rounded-xl px-4 py-2">✅ {{ m }}</div>
+  {% endfor %}
+  {% for m in get_flashed_messages(category_filter=["erro"]) %}
+  <div class="bg-red-500/10 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-2">❌ {{ m }}</div>
+  {% endfor %}
+</div>
+
+<main class="max-w-5xl mx-auto px-4 py-5 space-y-5">
+
+  <!-- ── WHATSAPP DO NEGÓCIO + LINK DA BIO ── -->
+  <section class="card rounded-2xl p-5 space-y-4">
+    <div class="grid md:grid-cols-2 gap-5">
+
+      <!-- Número WhatsApp do negócio -->
+      <div>
+        <h2 class="brand text-base font-700 text-white mb-1">📱 WhatsApp do negócio</h2>
+        <p class="text-slate-400 text-xs mb-3">O chatbot vai responder clientes neste número e você recebe novos agendamentos aqui.</p>
+        <form method="POST" action="/salvar_whatsapp" class="flex gap-2 {% if demo %}demo-overlay pointer-events-none{% endif %}">
+          <input name="whatsapp" value="{{ usuario.whatsapp or '' }}"
+                 class="inp rounded-xl px-3 py-2 text-sm flex-1"
+                 placeholder="5519999990000 (com 55 + DDD)"/>
+          <button class="btn-g text-white text-xs font-semibold px-4 py-2 rounded-xl shrink-0">Salvar</button>
+        </form>
+        {% if usuario.whatsapp %}
+        <p class="text-xs text-emerald-400 mt-2">✅ Conectado: {{ usuario.whatsapp }}</p>
+        <details class="mt-2">
+          <summary class="text-slate-500 text-xs cursor-pointer hover:text-white">⚙️ URL do webhook Evolution API</summary>
+          <code class="block mt-2 text-sky-300 text-xs bg-slate-900/70 px-3 py-2 rounded-xl break-all">{{ request.host_url }}webhook/{{ usuario.slug }}</code>
+          <p class="text-slate-600 text-xs mt-1">Evento: <strong class="text-slate-400">messages.upsert</strong></p>
+        </details>
+        {% else %}
+        <p class="text-xs text-amber-400 mt-2">⚠️ Salve seu número para ativar o chatbot e receber notificações.</p>
+        {% endif %}
+      </div>
+
+      <!-- Link da bio -->
+      <div>
+        <h2 class="brand text-base font-700 text-white mb-1">🔗 Link de agendamento</h2>
+        <p class="text-slate-400 text-xs mb-3">Cole na bio do Instagram, stories ou mande no WhatsApp. Clientes abrem e agendam direto.</p>
+        {% if link_bio %}
+        <div class="bg-slate-900/60 rounded-xl px-3 py-2 flex items-center gap-2 flex-wrap">
+          <code id="link-bio-txt" class="text-emerald-300 text-xs break-all flex-1">{{ link_bio }}</code>
+          <div class="flex gap-1 shrink-0">
+            <button onclick="copiarLink()" class="btn-g text-white text-xs font-semibold px-3 py-1.5 rounded-lg">Copiar</button>
+            <a href="{{ link_bio }}" target="_blank" class="btn-b text-white text-xs font-semibold px-3 py-1.5 rounded-lg">Abrir ↗</a>
+          </div>
+        </div>
+        <span id="copy-toast" class="toast text-emerald-400 text-xs mt-1 block">✅ Link copiado!</span>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── TABS ── -->
+  <div class="flex gap-2 flex-wrap">
+    <button onclick="tab('clientes')" id="tab-clientes" class="tab-btn active text-sm px-4 py-2 rounded-xl">👥 Clientes</button>
+    <button onclick="tab('agenda')"   id="tab-agenda"   class="tab-btn text-sm px-4 py-2 rounded-xl">📅 Agenda</button>
+    <button onclick="tab('agendados')" id="tab-agendados" class="tab-btn text-sm px-4 py-2 rounded-xl">✅ Agendados</button>
+    <button onclick="tab('fila')"     id="tab-fila"     class="tab-btn text-sm px-4 py-2 rounded-xl">📤 Lembretes</button>
+  </div>
+
+  <!-- ════ ABA CLIENTES ════ -->
+  <div id="pane-clientes" class="tab-pane active space-y-4">
+    <div class="grid md:grid-cols-2 gap-4">
+
+      <!-- Formulário -->
+      <div class="card rounded-2xl p-5 {% if demo %}demo-overlay pointer-events-none{% endif %}">
+        <h3 class="brand text-base font-700 text-white mb-1">Cadastrar cliente</h3>
+        <p class="text-slate-500 text-xs mb-4">A IA gera e envia a mensagem automaticamente nos ciclos marcados.</p>
+        <form method="POST" action="/salvar_cliente" class="space-y-3">
+          <input name="nome" class="inp w-full rounded-xl px-4 py-3 text-sm" placeholder="Nome completo" required/>
+          <input name="celular" class="inp w-full rounded-xl px-4 py-3 text-sm" placeholder="WhatsApp (ex: 19 99999-0000)" required/>
+          <input name="servico" class="inp w-full rounded-xl px-4 py-3 text-sm" placeholder="Serviço realizado (ex: corte, manicure)"/>
+
+          <!-- Ciclos de lembrete -->
+          <div>
+            <p class="text-slate-400 text-xs mb-2">🔁 Enviar lembrete automático em:</p>
+            <div class="flex gap-2 flex-wrap">
+              {% for d in [7, 15, 30] %}
+              <div>
+                <input type="checkbox" name="ciclo" value="{{ d }}" id="c{{ d }}"
+                       class="ciclo-cb sr-only" checked/>
+                <label for="c{{ d }}"
+                       class="cursor-pointer block text-xs font-semibold px-4 py-2 rounded-xl border border-white/10 text-slate-400 transition-all hover:border-emerald-500/50">
+                  {{ d }} dias
+                </label>
+              </div>
+              {% endfor %}
+            </div>
+            <p class="text-slate-600 text-xs mt-2">Selecione um ou mais. A IA gera a mensagem personalizada em cada data.</p>
+          </div>
+
+          <div class="rounded-xl border border-emerald-500/20 bg-emerald-900/20 px-4 py-3 text-xs text-emerald-300">
+            🤖 Mensagem gerada pela IA com nome, serviço e link de agendamento incluídos automaticamente.
+          </div>
+          <button class="btn-g w-full rounded-xl py-3 text-white font-semibold text-sm">Cadastrar e agendar lembretes</button>
+        </form>
+      </div>
+
+      <!-- Lista -->
+      <div class="card rounded-2xl p-5">
+        <h3 class="brand text-base font-700 text-white mb-4">
+          Clientes <span class="text-slate-500 font-normal text-sm">({{ clientes|length }})</span>
+        </h3>
+        {% if clientes %}
+        <div class="space-y-2 max-h-96 overflow-y-auto pr-1">
+          {% for c in clientes %}
+          <div class="card2 rounded-xl px-4 py-3 flex justify-between items-center gap-2">
+            <div>
+              <p class="text-sm font-medium text-white">{{ c.nome }}</p>
+              <p class="text-xs text-slate-400">{{ c.celular }}</p>
+              {% if c.servico %}<p class="text-xs text-slate-500">{{ c.servico }}</p>{% endif %}
+            </div>
+            <a href="https://wa.me/55{{ c.celular|replace(' ','')|replace('-','')|replace('(',')|replace(')','') }}"
+               target="_blank" class="text-emerald-400 text-xs hover:text-emerald-300 shrink-0">WA ↗</a>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+          <p class="text-4xl mb-3">👥</p>
+          <p class="text-slate-500 text-sm">Nenhum cliente ainda.</p>
+          <p class="text-slate-600 text-xs mt-1">Cadastre ao lado para começar.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ ABA AGENDA ════ -->
+  <div id="pane-agenda" class="tab-pane space-y-4">
+    <div class="grid md:grid-cols-2 gap-4">
+
+      <!-- Adicionar horário -->
+      <div class="card rounded-2xl p-5 {% if demo %}demo-overlay pointer-events-none{% endif %}">
+        <h3 class="brand text-base font-700 text-white mb-1">Adicionar horário livre</h3>
+        <p class="text-slate-400 text-xs mb-4">Clientes escolhem esses horários pelo link de agendamento.</p>
+        <form method="POST" action="/salvar_horario" class="space-y-3">
+          <div>
+            <label class="block text-slate-400 text-xs uppercase tracking-wider mb-1">Data (DD/MM/AAAA)</label>
+            <input name="data" class="inp w-full rounded-xl px-4 py-3 text-sm" placeholder="Ex: 02/06/2026" required/>
+          </div>
+          <div>
+            <label class="block text-slate-400 text-xs uppercase tracking-wider mb-1">Hora de início</label>
+            <input name="hora_inicio" class="inp w-full rounded-xl px-4 py-3 text-sm" placeholder="Ex: 14:30" required/>
+          </div>
+          <button class="btn-g w-full rounded-xl py-3 text-white font-semibold text-sm">Adicionar horário</button>
+        </form>
+      </div>
+
+      <!-- Lista de horários -->
+      <div class="card rounded-2xl p-5">
+        <h3 class="brand text-base font-700 text-white mb-4">
+          Horários <span class="text-slate-500 font-normal text-sm">({{ horarios|length }})</span>
+        </h3>
+        {% if horarios %}
+        <div class="space-y-2 max-h-96 overflow-y-auto pr-1">
+          {% for h in horarios %}
+          <div class="card2 rounded-xl px-4 py-3 flex items-center justify-between gap-2">
+            <div>
+              <p class="text-sm font-medium text-white">{{ h.data }} — {{ h.hora_inicio }}</p>
+              <p class="text-xs {{ 'text-red-400' if h.ocupado else 'text-emerald-400' }}">
+                {{ '🔴 Ocupado' if h.ocupado else '🟢 Livre' }}
+              </p>
+            </div>
+            {% if not h.ocupado and not demo %}
+            <form method="POST" action="/deletar_horario">
+              <input type="hidden" name="horario_id" value="{{ h.id }}"/>
+              <button class="btn-r text-white text-xs px-3 py-1.5 rounded-lg">Remover</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-8">
+          <p class="text-4xl mb-3">📅</p>
+          <p class="text-slate-500 text-sm">Nenhum horário ainda.</p>
+          <p class="text-slate-600 text-xs mt-1">Adicione horários para que clientes possam agendar.</p>
+        </div>
+        {% endif %}
+
+        {% if link_bio %}
+        <div class="mt-4 pt-4 border-t border-white/5">
+          <p class="text-xs text-slate-500 mb-2">Link da sua agenda pública:</p>
+          <a href="{{ link_bio }}" target="_blank"
+             class="btn-g block text-center text-white text-sm font-semibold py-2 rounded-xl">
+            Ver agenda pública ↗
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ ABA AGENDADOS ════ -->
+  <div id="pane-agendados" class="tab-pane">
+    <div class="card rounded-2xl p-5">
+      <h3 class="brand text-base font-700 text-white mb-4">
+        Agendamentos recebidos <span class="text-slate-500 font-normal text-sm">({{ agendamentos_publicos|length }})</span>
+      </h3>
+      {% if agendamentos_publicos %}
+      <div class="space-y-2">
+        {% for ap in agendamentos_publicos %}
+        <div class="card2 rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p class="text-sm font-medium text-white">{{ ap.nome }}</p>
+            <p class="text-xs text-slate-400">{{ ap.celular }}{% if ap.servico %} · {{ ap.servico }}{% endif %}</p>
+            <p class="text-xs text-emerald-400 mt-0.5">📅 {{ ap.data }} às {{ ap.hora_inicio }}</p>
+          </div>
+          <div class="flex gap-2 items-center">
+            <span class="text-xs px-2 py-1 rounded-lg font-medium
+              {% if ap.status == 'confirmado' %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
+              {% elif ap.status == 'cancelado' %}bg-red-500/10 text-red-400 border border-red-500/20
+              {% else %}bg-amber-500/10 text-amber-400 border border-amber-500/20{% endif %}">
+              {{ ap.status|capitalize }}
+            </span>
+            <a href="https://wa.me/55{{ ap.celular|replace(' ','')|replace('-','') }}"
+               target="_blank" class="text-emerald-400 text-xs hover:text-emerald-300">WA ↗</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-10">
+        <p class="text-4xl mb-3">✅</p>
+        <p class="text-slate-500 text-sm">Nenhum agendamento via link ainda.</p>
+        <p class="text-slate-600 text-xs mt-1">Compartilhe o link da bio para começar a receber.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ════ ABA LEMBRETES ════ -->
+  <div id="pane-fila" class="tab-pane">
+    <div class="card rounded-2xl p-5">
+      <h3 class="brand text-base font-700 text-white mb-4">
+        Fila de lembretes automáticos <span class="text-slate-500 font-normal text-sm">({{ agendamentos|length }})</span>
+      </h3>
+      {% if agendamentos %}
+      <div class="space-y-2">
+        {% for ag in agendamentos %}
+        <div class="card2 rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-white">{{ ag.cliente_nome }}</p>
+            <p class="text-xs text-slate-400">{{ ag.cliente_celular }}</p>
+            <p class="text-xs text-slate-600 mt-0.5 truncate">
+              {% if ag.mensagem_personalizada == '__IA__' %}
+                🤖 Mensagem gerada pela IA na data de envio
+              {% else %}
+                {{ ag.mensagem_personalizada }}
+              {% endif %}
+            </p>
+          </div>
+          <div class="text-right shrink-0">
+            <p class="text-xs font-semibold text-white">{{ ag.data_envio }}</p>
+            <span class="mt-1 inline-block text-xs px-2 py-1 rounded-lg
+              {{ 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' if ag.enviado
+                 else 'bg-amber-500/10 text-amber-400 border border-amber-500/20' }}">
+              {{ '✅ Enviado' if ag.enviado else '⏳ Aguardando' }}
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-10">
+        <p class="text-4xl mb-3">📤</p>
+        <p class="text-slate-500 text-sm">Nenhum lembrete na fila ainda.</p>
+        <p class="text-slate-600 text-xs mt-1">Cadastre clientes para gerar lembretes automáticos.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // ── Tabs
+  const PANES = ['clientes','agenda','agendados','fila'];
+  function tab(id) {
+    PANES.forEach(p => {
+      document.getElementById('pane-'+p).classList.remove('active');
+      document.getElementById('tab-'+p).classList.remove('active');
+    });
+    document.getElementById('pane-'+id).classList.add('active');
+    document.getElementById('tab-'+id).classList.add('active');
+  }
+
+  // ── Timer demo
+  let seg = {{ demo_seconds_remaining|default(0) }};
+  const timerEl = document.getElementById('hdr-timer');
+  function tick() {
+    if (!timerEl) return;
+    const m = String(Math.floor(seg/60)).padStart(2,'0');
+    const s = String(seg%60).padStart(2,'0');
+    timerEl.textContent = m+':'+s;
+    if (seg > 0) { seg--; }
+    else {
+      clearInterval(timerInterval);
+      timerEl.textContent = '00:00';
+      // Redireciona para login quando expira
+      setTimeout(() => { window.location.href = '/login?demo_expirado=1'; }, 1500);
+    }
+  }
+  const timerInterval = setInterval(tick, 1000);
+  tick();
+
+  // ── Copiar link
+  function copiarLink() {
+    const txt = document.getElementById('link-bio-txt');
+    if (!txt) return;
+    navigator.clipboard.writeText(txt.textContent.trim()).then(() => {
+      const t = document.getElementById('copy-toast');
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2000);
+    });
+  }
+
+  // ── Checkbox ciclos visual
+  document.querySelectorAll('.ciclo-cb').forEach(cb => {
+    const lbl = document.querySelector('label[for="'+cb.id+'"]');
+    if (!lbl) return;
+    function sync() {
+      if (cb.checked) lbl.style.cssText = 'background:rgba(16,185,129,.2);border-color:#10b981;color:#34d399';
+      else            lbl.style.cssText = '';
+    }
+    cb.addEventListener('change', sync);
+    sync();
+  });
+
+  // ── Service Worker
+  if ('serviceWorker' in navigator)
+    navigator.serviceWorker.register('/static/service-worker.js').catch(()=>{});
+</script>
+</body>
+</html>
